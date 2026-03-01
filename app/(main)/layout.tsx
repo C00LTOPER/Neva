@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { Home, Search, Bell, Settings } from "lucide-react";
+import { Home, Newspaper, Bookmark, Radio, Search, Settings } from "lucide-react";
 import { createClient } from "@supabase/supabase-js";
 
 const supabase = createClient(
@@ -27,33 +27,34 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
   }, []);
 
   const tabs = [
-    { icon: Home, path: "/chats", label: "Чаты" },
-    { icon: Search, path: "/search", label: "Поиск" },
-    { icon: Bell, path: "/feed", label: "Лента" },
-    { icon: Bell, path: "/subscriptions", label: "Подписки" },
-    { icon: Settings, path: "/my-channel", label: "Мой канал" },
+    { icon: Home, path: "/chats" },
+    { icon: Newspaper, path: "/feed" },
+    { icon: Bookmark, path: "/subscriptions" },
+    { icon: Radio, path: "/my-channel" },
+    { icon: Search, path: "/search" },
   ];
 
   return (
     <div className="flex min-h-screen bg-[#0a0a0f] overflow-hidden">
-      {/* Затемнение фона когда навигация открыта */}
       {open && (
-        <div
-          className="fixed inset-0 z-40"
-          onClick={() => setOpen(false)}
-        />
+        <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
       )}
 
-      {/* Левая навигация */}
       <div className={`fixed left-0 top-0 bottom-0 z-50 flex transition-all duration-300 ease-in-out ${open ? "translate-x-0" : "-translate-x-[52px]"}`}>
-        {/* Панель иконок */}
-        <div className="w-16 flex flex-col items-center py-8 gap-2 bg-[#0d0d1a]/95 backdrop-blur-xl border-r border-white/[0.06]">
-          {/* Лого вверху */}
-          <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center mb-4 shadow-lg shadow-purple-500/20">
-            <span className="text-white font-bold text-sm">N</span>
-          </div>
+        <div className="w-16 flex flex-col items-center py-8 bg-[#0d0d1a]/95 backdrop-blur-xl border-r border-white/[0.06]">
+          <button
+            onClick={() => { router.push("/profile"); setOpen(false); }}
+            className="w-10 h-10 rounded-full overflow-hidden ring-2 ring-white/10 hover:ring-purple-500/50 transition-all mb-6"
+          >
+            {profile?.avatar_url ? (
+              <img src={profile.avatar_url} alt="me" className="w-full h-full object-cover" />
+            ) : (
+              <div className="w-full h-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
+                <span className="text-white font-bold text-sm">{profile?.full_name?.[0] || "?"}</span>
+              </div>
+            )}
+          </button>
 
-          {/* Кнопки */}
           <div className="flex flex-col items-center gap-1 flex-1">
             {tabs.map((tab) => {
               const isActive = pathname.startsWith(tab.path);
@@ -76,51 +77,26 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
             })}
           </div>
 
-          {/* Настройки */}
           <button
             onClick={() => { router.push("/settings"); setOpen(false); }}
-            className={`w-11 h-11 rounded-2xl flex items-center justify-center transition-all mb-2 ${
-              pathname.startsWith("/settings") ? "text-white" : "text-white/30 hover:text-white/60"
+            className={`w-11 h-11 rounded-2xl flex items-center justify-center transition-all duration-200 ${
+              pathname.startsWith("/settings")
+                ? "bg-gradient-to-br from-blue-500/20 to-purple-600/20 text-white"
+                : "text-white/30 hover:text-white/60 hover:bg-white/5"
             }`}
           >
             <Settings className="w-5 h-5" strokeWidth={1.5} />
           </button>
-
-          {/* Аватарка пользователя */}
-          <button
-            onClick={() => { router.push("/profile"); setOpen(false); }}
-            className="w-10 h-10 rounded-full overflow-hidden ring-2 ring-white/10 hover:ring-purple-500/50 transition"
-          >
-            {profile?.avatar_url ? (
-              <img src={profile.avatar_url} alt="me" className="w-full h-full object-cover" />
-            ) : (
-              <div className="w-full h-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
-                <span className="text-white font-bold text-sm">{profile?.full_name?.[0] || "?"}</span>
-              </div>
-            )}
-          </button>
         </div>
 
-        {/* Тонкая линия-триггер справа от навигации */}
+        {/* Только одна линия-триггер */}
         <div
           className="w-1 h-full bg-gradient-to-b from-transparent via-purple-500/30 to-transparent cursor-pointer hover:via-purple-500/60 transition-all"
           onClick={() => setOpen(!open)}
         />
       </div>
 
-      {/* Линия когда навигация закрыта */}
-      {!open && (
-        <div
-          className="fixed left-0 top-0 bottom-0 w-1 bg-gradient-to-b from-transparent via-purple-500/20 to-transparent cursor-pointer hover:via-purple-500/50 transition-all z-50"
-          onClick={() => setOpen(true)}
-        />
-      )}
-
-      {/* Контент */}
-      <main
-        className="flex-1 min-h-screen transition-all duration-300"
-        onClick={() => open && setOpen(false)}
-      >
+      <main className="flex-1 min-h-screen ml-1" onClick={() => open && setOpen(false)}>
         {children}
       </main>
     </div>
