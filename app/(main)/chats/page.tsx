@@ -1,10 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
-
 import { useRouter } from "next/navigation";
 import { Search, Plus } from "lucide-react";
-
 import { supabase } from "@/lib/supabase";
 
 export default function ChatsPage() {
@@ -30,14 +28,13 @@ export default function ChatsPage() {
 
       const chatsWithMessages = await Promise.all(
         (chatsData || []).map(async (chat) => {
-          const { data: lastMsg } = await supabase
+          const { data: lastMsgs } = await supabase
             .from("messages")
             .select("*")
             .eq("chat_id", chat.id)
             .order("created_at", { ascending: false })
-            .limit(1)
-            .single();
-          return { ...chat, lastMessage: lastMsg };
+            .limit(1);
+          return { ...chat, lastMessage: lastMsgs?.[0] || null };
         })
       );
 
@@ -104,7 +101,6 @@ export default function ChatsPage() {
 
   return (
     <div className="min-h-screen bg-[#0a0a0f]">
-      {/* Заголовок */}
       <div className="px-4 pt-14 pb-2">
         <div className="flex items-center justify-between mb-4">
           <h1 className="text-2xl font-bold text-white">Сообщения</h1>
@@ -126,7 +122,6 @@ export default function ChatsPage() {
         </div>
       </div>
 
-      {/* Новый чат */}
       {showUsers && (
         <div className="px-4 mt-4">
           <div className="flex items-center justify-between mb-3">
@@ -158,7 +153,6 @@ export default function ChatsPage() {
         </div>
       )}
 
-      {/* Истории */}
       <div className="px-4 mt-2">
         <p className="text-white/40 text-xs font-medium uppercase tracking-wider mb-2">Истории</p>
         <div className="flex gap-3 overflow-x-auto pb-2">
@@ -173,7 +167,6 @@ export default function ChatsPage() {
 
       <div className="mx-4 h-px bg-white/[0.06] my-3" />
 
-      {/* Чаты */}
       <div className="px-4 pb-8">
         <p className="text-white/40 text-xs font-medium uppercase tracking-wider mb-3">Чаты</p>
         {loading ? (
