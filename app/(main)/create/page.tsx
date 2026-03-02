@@ -1,14 +1,11 @@
 "use client";
 
 import { useState, useRef } from "react";
-import { createClient } from "@supabase/supabase-js";
+
 import { useRouter } from "next/navigation";
 import { ArrowLeft, Image, Video, X, AlertCircle } from "lucide-react";
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
+import { supabase } from "@/lib/supabase";
 
 const ALLOWED_IMAGE_FORMATS = ["image/jpeg", "image/png", "image/webp", "image/heic"];
 const ALLOWED_VIDEO_FORMATS = ["video/mp4", "video/mov", "video/quicktime", "video/mpeg"];

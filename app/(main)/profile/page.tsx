@@ -1,14 +1,11 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { createClient } from "@supabase/supabase-js";
+
 import { Settings, Grid, Heart, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
+import { supabase } from "@/lib/supabase";
 
 function BioText({ bio }: { bio: string }) {
   const [expanded, setExpanded] = useState(false);

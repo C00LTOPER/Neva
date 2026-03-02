@@ -1,14 +1,11 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { createClient } from "@supabase/supabase-js";
+
 import { useRouter } from "next/navigation";
 import { MessageCircle, Repeat2, Eye, Settings, X } from "lucide-react";
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
+import { supabase } from "@/lib/supabase";
 
 function timeAgo(date: string) {
   const diff = Date.now() - new Date(date).getTime();

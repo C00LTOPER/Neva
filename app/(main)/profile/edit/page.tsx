@@ -1,15 +1,12 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
-import { createClient } from "@supabase/supabase-js";
+
 import { useRouter } from "next/navigation";
 import { ArrowLeft, Camera, X } from "lucide-react";
 import Cropper from "react-easy-crop";
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
+import { supabase } from "@/lib/supabase";
 
 const ALLOWED_FORMATS = ["image/jpeg", "image/png", "image/webp", "image/heic"];
 const ALLOWED_FORMATS_TEXT = "JPG, PNG, WEBP, HEIC";
