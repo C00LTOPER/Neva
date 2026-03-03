@@ -125,7 +125,7 @@ export default function LoginPage() {
               placeholder="Введите код"
               value={otp}
               onChange={(e) => setOtp(e.target.value)}
-              maxLength={6}
+              maxLength={8}
               className="w-full h-12 px-4 rounded-2xl bg-white/10 border border-white/10 text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-purple-500 text-center text-xl tracking-widest"
             />
             {error && <p className="text-red-400 text-sm text-center">{error}</p>}
