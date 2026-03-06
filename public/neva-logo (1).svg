@@ -1,0 +1,71 @@
+<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bgGrad" x1="0" y1="0" x2="512" y2="512" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#0d0d2b"/>
+      <stop offset="100%" stop-color="#0a0a1a"/>
+    </linearGradient>
+    <linearGradient id="nFill" x1="60" y1="60" x2="452" y2="452" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#7B8FFF"/>
+      <stop offset="45%" stop-color="#3D5AFE"/>
+      <stop offset="100%" stop-color="#7B5CFF"/>
+    </linearGradient>
+    <linearGradient id="shineGrad" x1="60" y1="60" x2="260" y2="260" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.18"/>
+      <stop offset="100%" stop-color="#ffffff" stop-opacity="0"/>
+    </linearGradient>
+    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="10" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="bgGlow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="30" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="512" height="512" rx="112" fill="url(#bgGrad)"/>
+
+  <!-- Border -->
+  <rect x="2" y="2" width="508" height="508" rx="111" fill="none" stroke="rgba(100,120,255,0.2)" stroke-width="2.5"/>
+
+  <!-- Glow behind N -->
+  <ellipse cx="256" cy="256" rx="200" ry="190" fill="#3D5AFE" fill-opacity="0.07" filter="url(#bgGlow)"/>
+
+  <!-- Big N letter path - clean, fills the square nicely -->
+  <path
+    d="
+      M 72 72
+      L 72 440
+      L 152 440
+      L 152 192
+      L 360 440
+      L 440 440
+      L 440 72
+      L 360 72
+      L 360 320
+      L 152 72
+      Z
+    "
+    fill="url(#nFill)"
+    filter="url(#glow)"
+  />
+
+  <!-- Shine overlay on N -->
+  <path
+    d="
+      M 72 72
+      L 72 440
+      L 152 440
+      L 152 192
+      L 360 440
+      L 440 440
+      L 440 72
+      L 360 72
+      L 360 320
+      L 152 72
+      Z
+    "
+    fill="url(#shineGrad)"
+  />
+</svg>

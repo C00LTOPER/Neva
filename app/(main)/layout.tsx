@@ -3,8 +3,6 @@
 import { useState, useEffect } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { Home, Newspaper, Bookmark, Radio, Search, Settings } from "lucide-react";
-
-
 import { supabase } from "@/lib/supabase";
 
 export default function MainLayout({ children }: { children: React.ReactNode }) {
@@ -16,7 +14,7 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
   useEffect(() => {
     const load = async () => {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+      if (!user) { router.replace("/login"); return; }
       const { data } = await supabase.from("profiles").select("*").eq("id", user.id).single();
       setProfile(data);
     };
@@ -86,7 +84,6 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
           </button>
         </div>
 
-        {/* Только одна линия-триггер */}
         <div
           className="w-1 h-full bg-gradient-to-b from-transparent via-purple-500/30 to-transparent cursor-pointer hover:via-purple-500/60 transition-all"
           onClick={() => setOpen(!open)}

@@ -4,6 +4,10 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "NEVA",
   description: "NEVA Social Network",
+  icons: {
+    icon: "/neva-logo.svg",
+    apple: "/neva-logo.svg",
+  },
 };
 
 export default function RootLayout({
