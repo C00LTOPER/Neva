@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Eye, EyeOff } from "lucide-react";
 import { supabase } from "@/lib/supabase";
@@ -26,29 +26,11 @@ const inputStyle: React.CSSProperties = {
 
 export default function LoginPage() {
   const router = useRouter();
-  const [step, setStep] = useState<"form" | "otp">("form");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const [otp, setOtp] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [timer, setTimer] = useState(60);
-  const [canResend, setCanResend] = useState(false);
-
-  useEffect(() => {
-    if (step === "otp") {
-      setTimer(60);
-      setCanResend(false);
-      const interval = setInterval(() => {
-        setTimer(t => {
-          if (t <= 1) { clearInterval(interval); setCanResend(true); return 0; }
-          return t - 1;
-        });
-      }, 1000);
-      return () => clearInterval(interval);
-    }
-  }, [step]);
 
   const handleLogin = async () => {
     setLoading(true);
@@ -59,68 +41,9 @@ export default function LoginPage() {
       setLoading(false);
       return;
     }
-    setStep("otp");
-    setLoading(false);
-  };
-
-  const handleVerifyOtp = async () => {
-    setLoading(true);
-    setError(null);
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) { setError("Сессия истекла, войдите снова"); setLoading(false); return; }
     router.replace("/feed");
     setLoading(false);
   };
-
-  const handleResend = async () => {
-    setError(null);
-    setCanResend(false);
-    setTimer(60);
-    await supabase.auth.signInWithOtp({ email });
-    const interval = setInterval(() => {
-      setTimer(t => {
-        if (t <= 1) { clearInterval(interval); setCanResend(true); return 0; }
-        return t - 1;
-      });
-    }, 1000);
-  };
-
-  if (step === "otp") return (
-    <main className="relative flex min-h-screen items-center justify-center overflow-hidden"
-      style={{ background: "radial-gradient(ellipse at 50% 30%, rgba(61,90,254,0.2) 0%, rgba(123,92,255,0.15) 40%, #0a0a0f 70%)" }}>
-      <div className="w-full max-w-sm px-6">
-        <div className="rounded-3xl p-8"
-          style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.08)", backdropFilter: "blur(20px)" }}>
-          <button onClick={() => setStep("form")} className="text-white/40 text-sm mb-6 flex items-center gap-2">
-            ← Назад
-          </button>
-          <h1 className="text-2xl font-bold text-white text-center mb-2">Подтвердите вход</h1>
-          <p className="text-white/40 text-sm text-center mb-8">
-            Код отправлен на <span className="text-blue-400">{email}</span>
-          </p>
-          <div className="space-y-4">
-            <input placeholder="Введите код" value={otp} onChange={e => setOtp(e.target.value)}
-              maxLength={8} style={{ ...inputStyle, textAlign: "center", fontSize: "24px", letterSpacing: "8px" }} />
-            {error && <p className="text-red-400 text-sm text-center">{error}</p>}
-            <button onClick={handleVerifyOtp} disabled={loading || otp.length < 1}
-              className="w-full py-3.5 rounded-2xl text-white font-semibold disabled:opacity-40"
-              style={{ background: "linear-gradient(135deg, #3D5AFE, #7B5CFF)" }}>
-              {loading ? "Проверяем..." : "Войти"}
-            </button>
-          </div>
-          <div className="text-center mt-6">
-            {canResend ? (
-              <button onClick={handleResend} className="text-blue-400 text-sm">Отправить ещё раз</button>
-            ) : (
-              <p className="text-white/30 text-sm">
-                Повторная отправка через {String(Math.floor(timer / 60)).padStart(2, "0")}:{String(timer % 60).padStart(2, "0")}
-              </p>
-            )}
-          </div>
-        </div>
-      </div>
-    </main>
-  );
 
   return (
     <main className="relative flex min-h-screen items-center justify-center overflow-hidden"
@@ -144,7 +67,8 @@ export default function LoginPage() {
             <div>
               <p className="text-white/40 text-xs mb-1.5 uppercase tracking-wider">Email</p>
               <input type="email" value={email} onChange={e => setEmail(e.target.value)}
-                placeholder="example@mail.com" autoComplete="email" style={inputStyle} />
+                placeholder="example@mail.com" autoComplete="email" style={inputStyle}
+                onKeyDown={e => e.key === "Enter" && handleLogin()} />
             </div>
             <div>
               <p className="text-white/40 text-xs mb-1.5 uppercase tracking-wider">Пароль</p>
@@ -152,7 +76,8 @@ export default function LoginPage() {
                 <input type={showPassword ? "text" : "password"} value={password}
                   onChange={e => setPassword(e.target.value)}
                   placeholder="Введите пароль" autoComplete="current-password"
-                  style={{ ...inputStyle, paddingRight: "44px" }} />
+                  style={{ ...inputStyle, paddingRight: "44px" }}
+                  onKeyDown={e => e.key === "Enter" && handleLogin()} />
                 <button onClick={() => setShowPassword(!showPassword)}
                   className="absolute right-4 top-1/2 -translate-y-1/2 text-white/30">
                   {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
@@ -162,7 +87,7 @@ export default function LoginPage() {
 
             {error && <p className="text-red-400 text-sm text-center">{error}</p>}
 
-            <button onClick={handleLogin} disabled={loading}
+            <button onClick={handleLogin} disabled={loading || !email || !password}
               className="w-full py-3.5 rounded-2xl text-white font-semibold disabled:opacity-40 transition mt-2"
               style={{ background: "linear-gradient(135deg, #3D5AFE, #7B5CFF)" }}>
               {loading ? "Входим..." : "Войти"}
