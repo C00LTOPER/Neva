@@ -6,42 +6,104 @@ import { ChevronDown, Eye, EyeOff } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 
 const COUNTRIES = [
-  { name: "Россия", code: "RU", flag: "🇷🇺", dial: "+7", format: "XXX XXX-XX-XX", digits: 10 },
-  { name: "США", code: "US", flag: "🇺🇸", dial: "+1", format: "XXX XXX-XXXX", digits: 10 },
-  { name: "Великобритания", code: "GB", flag: "🇬🇧", dial: "+44", format: "XXXX XXXXXX", digits: 10 },
-  { name: "Германия", code: "DE", flag: "🇩🇪", dial: "+49", format: "XXXX XXXXXXX", digits: 11 },
-  { name: "Франция", code: "FR", flag: "🇫🇷", dial: "+33", format: "X XX XX XX XX", digits: 9 },
-  { name: "Италия", code: "IT", flag: "🇮🇹", dial: "+39", format: "XXX XXX XXXX", digits: 10 },
-  { name: "Испания", code: "ES", flag: "🇪🇸", dial: "+34", format: "XXX XXX XXX", digits: 9 },
-  { name: "Китай", code: "CN", flag: "🇨🇳", dial: "+86", format: "XXX XXXX XXXX", digits: 11 },
-  { name: "Япония", code: "JP", flag: "🇯🇵", dial: "+81", format: "XX XXXX XXXX", digits: 10 },
-  { name: "Индия", code: "IN", flag: "🇮🇳", dial: "+91", format: "XXXXX XXXXX", digits: 10 },
-  { name: "Бразилия", code: "BR", flag: "🇧🇷", dial: "+55", format: "XX XXXXX-XXXX", digits: 11 },
-  { name: "Канада", code: "CA", flag: "🇨🇦", dial: "+1", format: "XXX XXX-XXXX", digits: 10 },
   { name: "Австралия", code: "AU", flag: "🇦🇺", dial: "+61", format: "XXX XXX XXX", digits: 9 },
-  { name: "Казахстан", code: "KZ", flag: "🇰🇿", dial: "+7", format: "XXX XXX-XX-XX", digits: 10 },
-  { name: "Украина", code: "UA", flag: "🇺🇦", dial: "+380", format: "XX XXX XX XX", digits: 9 },
-  { name: "Беларусь", code: "BY", flag: "🇧🇾", dial: "+375", format: "XX XXX-XX-XX", digits: 9 },
-  { name: "Узбекистан", code: "UZ", flag: "🇺🇿", dial: "+998", format: "XX XXX XX XX", digits: 9 },
+  { name: "Австрия", code: "AT", flag: "🇦🇹", dial: "+43", format: "XXX XXXXXXX", digits: 10 },
   { name: "Азербайджан", code: "AZ", flag: "🇦🇿", dial: "+994", format: "XX XXX XX XX", digits: 9 },
+  { name: "Албания", code: "AL", flag: "🇦🇱", dial: "+355", format: "XX XXX XXXX", digits: 9 },
+  { name: "Алжир", code: "DZ", flag: "🇩🇿", dial: "+213", format: "XXX XXX XXXX", digits: 10 },
+  { name: "Ангола", code: "AO", flag: "🇦🇴", dial: "+244", format: "XXX XXX XXX", digits: 9 },
+  { name: "Аргентина", code: "AR", flag: "🇦🇷", dial: "+54", format: "XXX XXX XXXX", digits: 10 },
   { name: "Армения", code: "AM", flag: "🇦🇲", dial: "+374", format: "XX XXX XXX", digits: 8 },
-  { name: "Грузия", code: "GE", flag: "🇬🇪", dial: "+995", format: "XXX XX XX XX", digits: 9 },
-  { name: "Турция", code: "TR", flag: "🇹🇷", dial: "+90", format: "XXX XXX XX XX", digits: 10 },
-  { name: "ОАЭ", code: "AE", flag: "🇦🇪", dial: "+971", format: "XX XXX XXXX", digits: 9 },
-  { name: "Израиль", code: "IL", flag: "🇮🇱", dial: "+972", format: "XX XXX XXXX", digits: 9 },
-  { name: "Польша", code: "PL", flag: "🇵🇱", dial: "+48", format: "XXX XXX XXX", digits: 9 },
-  { name: "Нидерланды", code: "NL", flag: "🇳🇱", dial: "+31", format: "X XX XX XX XX", digits: 9 },
-  { name: "Швеция", code: "SE", flag: "🇸🇪", dial: "+46", format: "XX XXX XX XX", digits: 9 },
-  { name: "Норвегия", code: "NO", flag: "🇳🇴", dial: "+47", format: "XXX XX XXX", digits: 8 },
-  { name: "Финляндия", code: "FI", flag: "🇫🇮", dial: "+358", format: "XX XXX XXXX", digits: 9 },
-  { name: "Швейцария", code: "CH", flag: "🇨🇭", dial: "+41", format: "XX XXX XX XX", digits: 9 },
-  { name: "Португалия", code: "PT", flag: "🇵🇹", dial: "+351", format: "XXX XXX XXX", digits: 9 },
-  { name: "Мексика", code: "MX", flag: "🇲🇽", dial: "+52", format: "XXX XXX XXXX", digits: 10 },
-  { name: "Аргентина", code: "AR", flag: "🇦🇷", dial: "+54", format: "XXX XXX-XXXX", digits: 10 },
-  { name: "Южная Корея", code: "KR", flag: "🇰🇷", dial: "+82", format: "XX XXXX XXXX", digits: 10 },
-  { name: "Таиланд", code: "TH", flag: "🇹🇭", dial: "+66", format: "XX XXX XXXX", digits: 9 },
+  { name: "Афганистан", code: "AF", flag: "🇦🇫", dial: "+93", format: "XX XXX XXXX", digits: 9 },
+  { name: "Бангладеш", code: "BD", flag: "🇧🇩", dial: "+880", format: "XXXX XXXXXX", digits: 10 },
+  { name: "Беларусь", code: "BY", flag: "🇧🇾", dial: "+375", format: "XX XXX-XX-XX", digits: 9 },
+  { name: "Бельгия", code: "BE", flag: "🇧🇪", dial: "+32", format: "XXX XX XX XX", digits: 9 },
+  { name: "Болгария", code: "BG", flag: "🇧🇬", dial: "+359", format: "XXX XXX XXX", digits: 9 },
+  { name: "Боливия", code: "BO", flag: "🇧🇴", dial: "+591", format: "XXXXXXXX", digits: 8 },
+  { name: "Босния и Герцеговина", code: "BA", flag: "🇧🇦", dial: "+387", format: "XX XXX XXX", digits: 8 },
+  { name: "Бразилия", code: "BR", flag: "🇧🇷", dial: "+55", format: "XX XXXXX-XXXX", digits: 11 },
+  { name: "Великобритания", code: "GB", flag: "🇬🇧", dial: "+44", format: "XXXX XXXXXX", digits: 10 },
+  { name: "Венгрия", code: "HU", flag: "🇭🇺", dial: "+36", format: "XX XXX XXXX", digits: 9 },
+  { name: "Венесуэла", code: "VE", flag: "🇻🇪", dial: "+58", format: "XXX XXX XXXX", digits: 10 },
   { name: "Вьетнам", code: "VN", flag: "🇻🇳", dial: "+84", format: "XXX XXX XXXX", digits: 10 },
-].sort((a, b) => a.name.localeCompare(b.name, "ru"));
+  { name: "Гана", code: "GH", flag: "🇬🇭", dial: "+233", format: "XX XXX XXXX", digits: 9 },
+  { name: "Германия", code: "DE", flag: "🇩🇪", dial: "+49", format: "XXXX XXXXXXX", digits: 11 },
+  { name: "Греция", code: "GR", flag: "🇬🇷", dial: "+30", format: "XXX XXX XXXX", digits: 10 },
+  { name: "Грузия", code: "GE", flag: "🇬🇪", dial: "+995", format: "XXX XX XX XX", digits: 9 },
+  { name: "Дания", code: "DK", flag: "🇩🇰", dial: "+45", format: "XX XX XX XX", digits: 8 },
+  { name: "Египет", code: "EG", flag: "🇪🇬", dial: "+20", format: "XXX XXX XXXX", digits: 10 },
+  { name: "Израиль", code: "IL", flag: "🇮🇱", dial: "+972", format: "XX XXX XXXX", digits: 9 },
+  { name: "Индия", code: "IN", flag: "🇮🇳", dial: "+91", format: "XXXXX XXXXX", digits: 10 },
+  { name: "Индонезия", code: "ID", flag: "🇮🇩", dial: "+62", format: "XXX XXXX XXXX", digits: 11 },
+  { name: "Иордания", code: "JO", flag: "🇯🇴", dial: "+962", format: "X XXXX XXXX", digits: 9 },
+  { name: "Ирак", code: "IQ", flag: "🇮🇶", dial: "+964", format: "XXX XXX XXXX", digits: 10 },
+  { name: "Иран", code: "IR", flag: "🇮🇷", dial: "+98", format: "XXX XXX XXXX", digits: 10 },
+  { name: "Ирландия", code: "IE", flag: "🇮🇪", dial: "+353", format: "XX XXX XXXX", digits: 9 },
+  { name: "Исландия", code: "IS", flag: "🇮🇸", dial: "+354", format: "XXX XXXX", digits: 7 },
+  { name: "Испания", code: "ES", flag: "🇪🇸", dial: "+34", format: "XXX XXX XXX", digits: 9 },
+  { name: "Италия", code: "IT", flag: "🇮🇹", dial: "+39", format: "XXX XXX XXXX", digits: 10 },
+  { name: "Йемен", code: "YE", flag: "🇾🇪", dial: "+967", format: "XXX XXX XXX", digits: 9 },
+  { name: "Казахстан", code: "KZ", flag: "🇰🇿", dial: "+7", format: "XXX XXX-XX-XX", digits: 10 },
+  { name: "Камбоджа", code: "KH", flag: "🇰🇭", dial: "+855", format: "XX XXX XXX", digits: 8 },
+  { name: "Камерун", code: "CM", flag: "🇨🇲", dial: "+237", format: "XXXX XXXX", digits: 8 },
+  { name: "Канада", code: "CA", flag: "🇨🇦", dial: "+1", format: "XXX XXX-XXXX", digits: 10 },
+  { name: "Катар", code: "QA", flag: "🇶🇦", dial: "+974", format: "XXXX XXXX", digits: 8 },
+  { name: "Кения", code: "KE", flag: "🇰🇪", dial: "+254", format: "XXX XXX XXX", digits: 9 },
+  { name: "Кипр", code: "CY", flag: "🇨🇾", dial: "+357", format: "XX XXX XXX", digits: 8 },
+  { name: "Китай", code: "CN", flag: "🇨🇳", dial: "+86", format: "XXX XXXX XXXX", digits: 11 },
+  { name: "Колумбия", code: "CO", flag: "🇨🇴", dial: "+57", format: "XXX XXX XXXX", digits: 10 },
+  { name: "Кувейт", code: "KW", flag: "🇰🇼", dial: "+965", format: "XXXX XXXX", digits: 8 },
+  { name: "Кыргызстан", code: "KG", flag: "🇰🇬", dial: "+996", format: "XXX XXX XXX", digits: 9 },
+  { name: "Латвия", code: "LV", flag: "🇱🇻", dial: "+371", format: "XX XXX XXX", digits: 8 },
+  { name: "Ливан", code: "LB", flag: "🇱🇧", dial: "+961", format: "XX XXX XXX", digits: 8 },
+  { name: "Литва", code: "LT", flag: "🇱🇹", dial: "+370", format: "XXX XXXXX", digits: 8 },
+  { name: "Люксембург", code: "LU", flag: "🇱🇺", dial: "+352", format: "XXX XXX XXX", digits: 9 },
+  { name: "Малайзия", code: "MY", flag: "🇲🇾", dial: "+60", format: "XX XXXX XXXX", digits: 10 },
+  { name: "Марокко", code: "MA", flag: "🇲🇦", dial: "+212", format: "XXX XXX XXX", digits: 9 },
+  { name: "Мексика", code: "MX", flag: "🇲🇽", dial: "+52", format: "XXX XXX XXXX", digits: 10 },
+  { name: "Молдова", code: "MD", flag: "🇲🇩", dial: "+373", format: "XX XXX XXX", digits: 8 },
+  { name: "Монголия", code: "MN", flag: "🇲🇳", dial: "+976", format: "XXXX XXXX", digits: 8 },
+  { name: "Нигерия", code: "NG", flag: "🇳🇬", dial: "+234", format: "XXX XXX XXXX", digits: 10 },
+  { name: "Нидерланды", code: "NL", flag: "🇳🇱", dial: "+31", format: "X XX XX XX XX", digits: 9 },
+  { name: "Новая Зеландия", code: "NZ", flag: "🇳🇿", dial: "+64", format: "XX XXX XXXX", digits: 9 },
+  { name: "Норвегия", code: "NO", flag: "🇳🇴", dial: "+47", format: "XXX XX XXX", digits: 8 },
+  { name: "ОАЭ", code: "AE", flag: "🇦🇪", dial: "+971", format: "XX XXX XXXX", digits: 9 },
+  { name: "Оман", code: "OM", flag: "🇴🇲", dial: "+968", format: "XXXX XXXX", digits: 8 },
+  { name: "Пакистан", code: "PK", flag: "🇵🇰", dial: "+92", format: "XXX XXX XXXX", digits: 10 },
+  { name: "Перу", code: "PE", flag: "🇵🇪", dial: "+51", format: "XXX XXX XXX", digits: 9 },
+  { name: "Польша", code: "PL", flag: "🇵🇱", dial: "+48", format: "XXX XXX XXX", digits: 9 },
+  { name: "Португалия", code: "PT", flag: "🇵🇹", dial: "+351", format: "XXX XXX XXX", digits: 9 },
+  { name: "Румыния", code: "RO", flag: "🇷🇴", dial: "+40", format: "XXX XXX XXX", digits: 9 },
+  { name: "Россия", code: "RU", flag: "🇷🇺", dial: "+7", format: "XXX XXX-XX-XX", digits: 10 },
+  { name: "Саудовская Аравия", code: "SA", flag: "🇸🇦", dial: "+966", format: "XX XXX XXXX", digits: 9 },
+  { name: "Сербия", code: "RS", flag: "🇷🇸", dial: "+381", format: "XX XXX XXXX", digits: 9 },
+  { name: "Сингапур", code: "SG", flag: "🇸🇬", dial: "+65", format: "XXXX XXXX", digits: 8 },
+  { name: "Словакия", code: "SK", flag: "🇸🇰", dial: "+421", format: "XXX XXX XXX", digits: 9 },
+  { name: "Словения", code: "SI", flag: "🇸🇮", dial: "+386", format: "XX XXX XXX", digits: 8 },
+  { name: "США", code: "US", flag: "🇺🇸", dial: "+1", format: "XXX XXX-XXXX", digits: 10 },
+  { name: "Таджикистан", code: "TJ", flag: "🇹🇯", dial: "+992", format: "XX XXX XXXX", digits: 9 },
+  { name: "Таиланд", code: "TH", flag: "🇹🇭", dial: "+66", format: "XX XXX XXXX", digits: 9 },
+  { name: "Тунис", code: "TN", flag: "🇹🇳", dial: "+216", format: "XX XXX XXX", digits: 8 },
+  { name: "Туркменистан", code: "TM", flag: "🇹🇲", dial: "+993", format: "XX XXXXXX", digits: 8 },
+  { name: "Турция", code: "TR", flag: "🇹🇷", dial: "+90", format: "XXX XXX XX XX", digits: 10 },
+  { name: "Украина", code: "UA", flag: "🇺🇦", dial: "+380", format: "XX XXX XX XX", digits: 9 },
+  { name: "Уругвай", code: "UY", flag: "🇺🇾", dial: "+598", format: "X XXX XXXX", digits: 8 },
+  { name: "Узбекистан", code: "UZ", flag: "🇺🇿", dial: "+998", format: "XX XXX XX XX", digits: 9 },
+  { name: "Филиппины", code: "PH", flag: "🇵🇭", dial: "+63", format: "XXX XXX XXXX", digits: 10 },
+  { name: "Финляндия", code: "FI", flag: "🇫🇮", dial: "+358", format: "XX XXX XXXX", digits: 9 },
+  { name: "Франция", code: "FR", flag: "🇫🇷", dial: "+33", format: "X XX XX XX XX", digits: 9 },
+  { name: "Хорватия", code: "HR", flag: "🇭🇷", dial: "+385", format: "XX XXX XXX", digits: 8 },
+  { name: "Чехия", code: "CZ", flag: "🇨🇿", dial: "+420", format: "XXX XXX XXX", digits: 9 },
+  { name: "Чили", code: "CL", flag: "🇨🇱", dial: "+56", format: "X XXXX XXXX", digits: 9 },
+  { name: "Швейцария", code: "CH", flag: "🇨🇭", dial: "+41", format: "XX XXX XX XX", digits: 9 },
+  { name: "Швеция", code: "SE", flag: "🇸🇪", dial: "+46", format: "XX XXX XX XX", digits: 9 },
+  { name: "Шри-Ланка", code: "LK", flag: "🇱🇰", dial: "+94", format: "XX XXX XXXX", digits: 9 },
+  { name: "Эстония", code: "EE", flag: "🇪🇪", dial: "+372", format: "XXXX XXXX", digits: 8 },
+  { name: "Эфиопия", code: "ET", flag: "🇪🇹", dial: "+251", format: "XX XXX XXXX", digits: 9 },
+  { name: "Южная Корея", code: "KR", flag: "🇰🇷", dial: "+82", format: "XX XXXX XXXX", digits: 10 },
+  { name: "Южная Африка", code: "ZA", flag: "🇿🇦", dial: "+27", format: "XX XXX XXXX", digits: 9 },
+  { name: "Япония", code: "JP", flag: "🇯🇵", dial: "+81", format: "XX XXXX XXXX", digits: 10 },
+];
 
 const inputStyle: React.CSSProperties = {
   width: "100%",
@@ -132,17 +194,6 @@ export default function RegisterPage() {
       return;
     }
 
-    // Сохраняем профиль сразу
-    const { data: { user } } = await supabase.auth.getUser();
-    if (user) {
-      await supabase.from("profiles").upsert({
-        id: user.id,
-        full_name: fullName.trim(),
-        username: username.trim(),
-        phone: selectedCountry.dial + phone.replace(/\D/g, ""),
-      });
-    }
-
     setStep("otp");
     setLoading(false);
   };
@@ -152,7 +203,15 @@ export default function RegisterPage() {
     setError(null);
     const { data, error } = await supabase.auth.verifyOtp({ email, token: otp, type: "signup" });
     if (error) { setError("Неверный код. Попробуйте снова"); setLoading(false); return; }
-    if (data.session) router.replace("/feed");
+    if (data.session) {
+      await supabase.from("profiles").upsert({
+        id: data.session.user.id,
+        full_name: fullName.trim(),
+        username: username.trim(),
+        phone: selectedCountry.dial + phone.replace(/\D/g, ""),
+      });
+      router.replace("/feed");
+    }
   };
 
   const handleResend = async () => {
@@ -190,7 +249,7 @@ export default function RegisterPage() {
               maxLength={10} style={{ ...inputStyle, textAlign: "center", fontSize: "24px", letterSpacing: "8px" }} />
             {error && <p className="text-red-400 text-sm text-center">{error}</p>}
             <button onClick={handleVerifyOtp} disabled={loading || otp.length < 6}
-              className="w-full h-13 py-3.5 rounded-2xl text-white font-semibold disabled:opacity-40"
+              className="w-full py-3.5 rounded-2xl text-white font-semibold disabled:opacity-40"
               style={{ background: "linear-gradient(135deg, #3D5AFE, #7B5CFF)" }}>
               {loading ? "Проверяем..." : "Подтвердить"}
             </button>
@@ -213,7 +272,6 @@ export default function RegisterPage() {
     <main className="relative flex min-h-screen items-center justify-center overflow-hidden py-8"
       style={{ background: "radial-gradient(ellipse at 50% 30%, rgba(61,90,254,0.2) 0%, rgba(123,92,255,0.15) 40%, #0a0a0f 70%)" }}>
 
-      {/* Выбор страны */}
       {showCountryPicker && (
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60" onClick={() => setShowCountryPicker(false)}>
           <div className="w-full max-w-sm rounded-t-3xl pb-8"
@@ -247,14 +305,12 @@ export default function RegisterPage() {
 
           <div className="space-y-3">
 
-            {/* Имя */}
             <div>
               <p className="text-white/40 text-xs mb-1.5 uppercase tracking-wider">Имя</p>
               <input value={fullName} onChange={e => setFullName(e.target.value)}
                 placeholder="Ваше имя" style={inputStyle} />
             </div>
 
-            {/* Username */}
             <div>
               <p className="text-white/40 text-xs mb-1.5 uppercase tracking-wider">Username</p>
               <div className="relative">
@@ -266,7 +322,6 @@ export default function RegisterPage() {
               {username.length >= 3 && !usernameError && <p className="text-green-400 text-xs mt-1">✓ Доступен</p>}
             </div>
 
-            {/* Email */}
             <div>
               <p className="text-white/40 text-xs mb-1.5 uppercase tracking-wider">Email</p>
               <input type="email" value={email} onChange={e => setEmail(e.target.value)}
@@ -274,7 +329,6 @@ export default function RegisterPage() {
               {email && !validateEmail(email) && <p className="text-red-400 text-xs mt-1">Введите корректный email</p>}
             </div>
 
-            {/* Телефон */}
             <div>
               <p className="text-white/40 text-xs mb-1.5 uppercase tracking-wider">Телефон</p>
               <div className="flex gap-2">
@@ -296,7 +350,6 @@ export default function RegisterPage() {
               <p className="text-white/25 text-xs mt-1">Формат: {selectedCountry.dial} {selectedCountry.format}</p>
             </div>
 
-            {/* Пароль */}
             <div>
               <p className="text-white/40 text-xs mb-1.5 uppercase tracking-wider">Пароль</p>
               <div className="relative">
@@ -310,7 +363,6 @@ export default function RegisterPage() {
               </div>
             </div>
 
-            {/* Повторите пароль */}
             <div>
               <p className="text-white/40 text-xs mb-1.5 uppercase tracking-wider">Повторите пароль</p>
               <div className="relative">

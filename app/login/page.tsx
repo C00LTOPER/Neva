@@ -53,22 +53,12 @@ export default function LoginPage() {
   const handleLogin = async () => {
     setLoading(true);
     setError(null);
-
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) {
       setError(errorMessages[error.message] || "Произошла ошибка, попробуйте снова");
       setLoading(false);
       return;
     }
-
-    await supabase.auth.signOut();
-    const { error: otpError } = await supabase.auth.signInWithOtp({ email });
-    if (otpError) {
-      setError("Не удалось отправить код, попробуйте снова");
-      setLoading(false);
-      return;
-    }
-
     setStep("otp");
     setLoading(false);
   };
@@ -76,9 +66,10 @@ export default function LoginPage() {
   const handleVerifyOtp = async () => {
     setLoading(true);
     setError(null);
-    const { error } = await supabase.auth.verifyOtp({ email, token: otp, type: "magiclink" });
-    if (error) { setError("Неверный код. Попробуйте снова"); setLoading(false); return; }
-    router.push("/feed");
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) { setError("Сессия истекла, войдите снова"); setLoading(false); return; }
+    router.replace("/feed");
+    setLoading(false);
   };
 
   const handleResend = async () => {
@@ -111,7 +102,7 @@ export default function LoginPage() {
             <input placeholder="Введите код" value={otp} onChange={e => setOtp(e.target.value)}
               maxLength={8} style={{ ...inputStyle, textAlign: "center", fontSize: "24px", letterSpacing: "8px" }} />
             {error && <p className="text-red-400 text-sm text-center">{error}</p>}
-            <button onClick={handleVerifyOtp} disabled={loading || otp.length < 6}
+            <button onClick={handleVerifyOtp} disabled={loading || otp.length < 1}
               className="w-full py-3.5 rounded-2xl text-white font-semibold disabled:opacity-40"
               style={{ background: "linear-gradient(135deg, #3D5AFE, #7B5CFF)" }}>
               {loading ? "Проверяем..." : "Войти"}
@@ -138,27 +129,23 @@ export default function LoginPage() {
         <div className="rounded-3xl p-8"
           style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.08)", backdropFilter: "blur(20px)" }}>
 
-          {/* Логотип */}
-<div className="flex flex-col items-center mb-8">
-  <div className="mb-4">
-  <span className="text-5xl font-black tracking-widest"
-    style={{ background: "linear-gradient(135deg, #7B8FFF, #3D5AFE, #7B5CFF)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
-    NEVA
-  </span>
-</div>
-  <h1 className="text-3xl font-bold text-white text-center">Добро пожаловать</h1>
-  <p className="text-white/40 text-sm mt-1 text-center">Войдите в свой аккаунт</p>
-</div>
+          <div className="flex flex-col items-center mb-8">
+            <div className="mb-4">
+              <span className="text-5xl font-black tracking-widest"
+                style={{ background: "linear-gradient(135deg, #7B8FFF, #3D5AFE, #7B5CFF)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
+                NEVA
+              </span>
+            </div>
+            <h1 className="text-3xl font-bold text-white text-center">Добро пожаловать</h1>
+            <p className="text-white/40 text-sm mt-1 text-center">Войдите в свой аккаунт</p>
+          </div>
 
           <div className="space-y-3">
-            {/* Email */}
             <div>
               <p className="text-white/40 text-xs mb-1.5 uppercase tracking-wider">Email</p>
               <input type="email" value={email} onChange={e => setEmail(e.target.value)}
                 placeholder="example@mail.com" autoComplete="email" style={inputStyle} />
             </div>
-
-            {/* Пароль */}
             <div>
               <p className="text-white/40 text-xs mb-1.5 uppercase tracking-wider">Пароль</p>
               <div className="relative">
