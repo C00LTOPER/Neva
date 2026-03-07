@@ -10,16 +10,32 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [profile, setProfile] = useState<any>(null);
+  const [checked, setChecked] = useState(false);
 
   useEffect(() => {
     const load = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) { router.replace("/login"); return; }
-      const { data } = await supabase.from("profiles").select("*").eq("id", user.id).single();
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) { router.replace("/login"); return; }
+      const { data } = await supabase.from("profiles").select("*").eq("id", session.user.id).single();
       setProfile(data);
+      setChecked(true);
     };
     load();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === "SIGNED_OUT" || !session) {
+        router.replace("/login");
+      }
+    });
+
+    return () => subscription.unsubscribe();
   }, []);
+
+  if (!checked) return (
+    <div className="flex items-center justify-center min-h-screen bg-[#0a0a0f]">
+      <div className="w-8 h-8 border-2 border-purple-500 border-t-transparent rounded-full animate-spin" />
+    </div>
+  );
 
   const tabs = [
     { icon: Home, path: "/chats" },
