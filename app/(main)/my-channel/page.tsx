@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, Edit3, Camera, Check, X, Share2, ChevronDown, Calendar, MapPin, Mail, Link2, MessageCircle, Repeat2, Eye, ThumbsUp, ThumbsDown } from "lucide-react";
+import { Plus, Edit3, Camera, Check, X, Share2, ChevronDown, Calendar, MapPin, Mail, Link2, MessageCircle, Repeat2, Eye, ThumbsUp, ThumbsDown, MoreHorizontal } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import Cropper from "react-easy-crop";
 
@@ -34,8 +34,55 @@ function renderHashtags(text: string, router: any, expanded: boolean, isLong: bo
   );
 }
 
-function ChannelPostCard({ post, currentUserId, isOwner, onDelete, onEdit }: {
-  post: any; currentUserId: string; isOwner: boolean;
+function PostMenu({ onEdit, onDelete }: { onEdit: () => void; onDelete: () => void }) {
+  const [show, setShow] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClick = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setShow(false);
+    };
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, []);
+
+  return (
+    <div ref={ref} style={{ position: "relative" }}>
+      <button onClick={() => setShow(!show)}
+        className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-white/10 transition">
+        <MoreHorizontal className="w-5 h-5 text-white/50" />
+      </button>
+      {show && (
+        <div style={{
+          position: "fixed",
+          zIndex: 9999,
+          width: "176px",
+          background: "rgba(20,20,35,0.98)",
+          border: "1px solid rgba(255,255,255,0.12)",
+          borderRadius: "16px",
+          boxShadow: "0 8px 32px rgba(0,0,0,0.6)",
+          overflow: "hidden",
+          transform: "translateX(-160px) translateY(8px)"
+        }}>
+          <button onClick={() => { onEdit(); setShow(false); }}
+            className="w-full flex items-center gap-3 px-4 py-3 text-white/80 text-sm hover:bg-white/5 transition text-left">
+            <Edit3 className="w-4 h-4 shrink-0" />
+            Редактировать
+          </button>
+          <div className="h-px bg-white/[0.06]" />
+          <button onClick={() => { onDelete(); setShow(false); }}
+            className="w-full flex items-center gap-3 px-4 py-3 text-red-400 text-sm hover:bg-white/5 transition text-left">
+            <X className="w-4 h-4 shrink-0" />
+            Удалить пост
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ChannelPostCard({ post, currentUserId, isOwner, channel, onDelete, onEdit }: {
+  post: any; currentUserId: string; isOwner: boolean; channel: any;
   onDelete: (id: string) => void; onEdit: (post: any) => void;
 }) {
   const router = useRouter();
@@ -46,7 +93,6 @@ function ChannelPostCard({ post, currentUserId, isOwner, onDelete, onEdit }: {
   const [disliked, setDisliked] = useState(false);
   const [likesCount, setLikesCount] = useState(0);
   const [dislikesCount, setDislikesCount] = useState(0);
-  const [showMenu, setShowMenu] = useState(false);
   const isLong = post.content?.length > 120;
 
   useEffect(() => {
@@ -105,7 +151,17 @@ function ChannelPostCard({ post, currentUserId, isOwner, onDelete, onEdit }: {
     if (!confirm("Удалить пост?")) return;
     await supabase.from("posts").delete().eq("id", post.id);
     onDelete(post.id);
-    setShowMenu(false);
+  };
+
+  const timeAgo = (date: string) => {
+    const diff = Date.now() - new Date(date).getTime();
+    const mins = Math.floor(diff / 60000);
+    const hours = Math.floor(diff / 3600000);
+    const days = Math.floor(diff / 86400000);
+    if (mins < 1) return "только что";
+    if (mins < 60) return `${mins} мин. назад`;
+    if (hours < 24) return `${hours} ч. назад`;
+    return `${days} дн. назад`;
   };
 
   const formatCount = (n: number) => {
@@ -132,7 +188,7 @@ function ChannelPostCard({ post, currentUserId, isOwner, onDelete, onEdit }: {
         </div>
       )}
 
-      <div className="rounded-3xl overflow-hidden relative"
+      <div className="rounded-3xl"
         style={{
           background: "linear-gradient(135deg, rgba(255,255,255,0.06) 0%, rgba(255,255,255,0.02) 100%)",
           backdropFilter: "blur(20px)",
@@ -140,36 +196,29 @@ function ChannelPostCard({ post, currentUserId, isOwner, onDelete, onEdit }: {
           boxShadow: "0 10px 40px -5px rgba(123, 92, 255, 0.3)"
         }}>
 
-        {/* Три точки */}
-        <div className="absolute top-3 right-3 z-10">
-          <button onClick={() => setShowMenu(!showMenu)}
-            className="w-8 h-8 rounded-full flex items-center justify-center"
-            style={{ background: "rgba(255,255,255,0.08)" }}>
-            <span className="text-white/60 text-lg leading-none">···</span>
-          </button>
-          {showMenu && (
-            <>
-              <div className="fixed inset-0 z-10" onClick={() => setShowMenu(false)} />
-              <div className="absolute right-0 top-10 rounded-2xl overflow-hidden z-20 w-44"
-                style={{ background: "rgba(20,20,35,0.98)", border: "1px solid rgba(255,255,255,0.1)", boxShadow: "0 8px 32px rgba(0,0,0,0.4)" }}>
-                <button onClick={() => { onEdit(post); setShowMenu(false); }}
-                  className="w-full flex items-center gap-3 px-4 py-3 text-white/80 text-sm hover:bg-white/5 transition">
-                  <Edit3 className="w-4 h-4" />
-                  Редактировать
-                </button>
-                <div className="h-px bg-white/[0.06]" />
-                <button onClick={handleDelete}
-                  className="w-full flex items-center gap-3 px-4 py-3 text-red-400 text-sm hover:bg-white/5 transition">
-                  <X className="w-4 h-4" />
-                  Удалить пост
-                </button>
+        <div className="flex items-center gap-3 p-4 pb-2">
+          <div className="w-10 h-10 rounded-full overflow-hidden ring-2 ring-white/10 shrink-0"
+            style={{ background: "linear-gradient(135deg, #3D5AFE, #7B5CFF)" }}>
+            {channel?.avatar_url ? (
+              <img src={channel.avatar_url} alt="avatar" className="w-full h-full object-cover" />
+            ) : (
+              <div className="w-full h-full flex items-center justify-center">
+                <span className="text-white font-bold text-sm">{channel?.name?.[0] || "К"}</span>
               </div>
-            </>
-          )}
+            )}
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-white font-semibold text-sm truncate">{channel?.name || "Канал"}</p>
+            <p className="text-white/40 text-xs mt-0.5">{timeAgo(post.created_at)}</p>
+          </div>
+          <PostMenu
+            onEdit={() => onEdit(post)}
+            onDelete={handleDelete}
+          />
         </div>
 
         {post.content && (
-          <div className="px-4 pt-4 pb-2 pr-12">
+          <div className="px-4 py-2">
             <p className="text-white/90 text-sm leading-relaxed">
               {renderHashtags(post.content, router, expanded, isLong)}
             </p>
@@ -506,6 +555,7 @@ export default function MyChannelPage() {
                   <ChannelPostCard
                     key={post.id}
                     post={post}
+                    channel={channel}
                     currentUserId={currentUser?.id}
                     isOwner={currentUser?.id === channel.owner_id}
                     onDelete={(id) => setPosts(prev => prev.filter(p => p.id !== id))}
@@ -518,7 +568,6 @@ export default function MyChannelPage() {
         </div>
       </div>
 
-      {/* Модалка редактирования */}
       {editingPost && (
         <div className="fixed inset-0 bg-black/70 z-50 flex items-end justify-center" onClick={() => setEditingPost(null)}>
           <div className="w-full max-w-xl rounded-t-3xl pb-8 pt-6 px-6"
@@ -535,20 +584,39 @@ export default function MyChannelPage() {
                 style={{ background: "rgba(255,255,255,0.05)" }}>
                 Отмена
               </button>
-              <button onClick={async () => {
-                await supabase.from("posts").update({ content: editContent }).eq("id", editingPost.id);
-                setPosts(prev => prev.map(p => p.id === editingPost.id ? { ...p, content: editContent } : p));
-                setEditingPost(null);
-              }} className="flex-1 py-3 rounded-2xl text-white font-semibold"
-                style={{ background: "linear-gradient(135deg, #3D5AFE, #7B5CFF)" }}>
-                Сохранить
-              </button>
+             <button onClick={async () => {
+  await supabase.from("posts").update({ content: editContent }).eq("id", editingPost.id);
+  
+  // Обновляем хештеги
+  await supabase.from("post_hashtags").delete().eq("post_id", editingPost.id);
+  const newTags = [...new Set((editContent.match(/#[а-яёa-z0-9_]+/gi) || []).map(t => t.toLowerCase()))];
+  if (newTags.length > 0) {
+    for (const tag of newTags) {
+      const cleanTag = tag.slice(1);
+      await supabase.from("post_hashtags").insert({ post_id: editingPost.id, tag: cleanTag });
+      await supabase.from("hashtags").upsert({ tag: cleanTag }, { onConflict: "tag" });
+      await supabase.from("hashtags").update({
+        posts_count: (await supabase.from("post_hashtags").select("*", { count: "exact" }).eq("tag", cleanTag)).count || 0
+      }).eq("tag", cleanTag);
+    }
+  }
+
+  setPosts(prev => prev.map(p => p.id === editingPost.id ? { ...p, content: editContent } : p));
+  setEditingPost(null);
+}} className="flex-1 py-3 rounded-2xl text-white font-semibold"
+  style={{ background: "linear-gradient(135deg, #3D5AFE, #7B5CFF)" }}>
+  Сохранить
+</button>
+```
+
+Сохрани **Command + S** и задеплой:
+```
+cd ~/Desktop/Codex\ приложения/neva && git add . && git commit -m "fix edit save" && git push
             </div>
           </div>
         </div>
       )}
 
-      {/* О канале */}
       {showAbout && (
         <div className="fixed inset-0 bg-black/70 z-50 flex items-end justify-center" onClick={() => setShowAbout(false)}>
           <div className="w-full max-w-xl rounded-t-3xl pb-8 pt-6 px-6"
@@ -560,20 +628,6 @@ export default function MyChannelPage() {
               <div className="mb-4">
                 <p className="text-white/40 text-xs uppercase tracking-wider mb-2">Описание</p>
                 <p className="text-white/70 text-sm leading-relaxed">{channel.description}</p>
-              </div>
-            )}
-            {(channel.links || []).length > 0 && (
-              <div className="mb-4">
-                <p className="text-white/40 text-xs uppercase tracking-wider mb-2">Ссылки</p>
-                <div className="space-y-2">
-                  {(channel.links || []).map((link: string, i: number) => (
-                    <a key={i} href={link} target="_blank" rel="noopener noreferrer"
-                      className="flex items-center gap-2 text-blue-400 text-sm truncate">
-                      <Link2 className="w-3.5 h-3.5 shrink-0" />
-                      {link}
-                    </a>
-                  ))}
-                </div>
               </div>
             )}
             <div className="mb-4">
