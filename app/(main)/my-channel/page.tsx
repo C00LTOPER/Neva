@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, Edit3, Camera, Check, X, Share2, Flag, ChevronDown, Calendar, MapPin, Mail, Link2, MessageCircle, Repeat2, Eye, ThumbsUp, ThumbsDown } from "lucide-react";
+import { Plus, Edit3, Camera, Check, X, Share2, ChevronDown, Calendar, MapPin, Mail, Link2, MessageCircle, Repeat2, Eye, ThumbsUp, ThumbsDown } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import Cropper from "react-easy-crop";
 
@@ -34,7 +34,10 @@ function renderHashtags(text: string, router: any, expanded: boolean, isLong: bo
   );
 }
 
-function ChannelPostCard({ post, currentUserId, isOwner }: { post: any; currentUserId: string; isOwner: boolean }) {
+function ChannelPostCard({ post, currentUserId, isOwner, onDelete, onEdit }: {
+  post: any; currentUserId: string; isOwner: boolean;
+  onDelete: (id: string) => void; onEdit: (post: any) => void;
+}) {
   const router = useRouter();
   const [views, setViews] = useState(post.views || 0);
   const [expanded, setExpanded] = useState(false);
@@ -43,6 +46,7 @@ function ChannelPostCard({ post, currentUserId, isOwner }: { post: any; currentU
   const [disliked, setDisliked] = useState(false);
   const [likesCount, setLikesCount] = useState(0);
   const [dislikesCount, setDislikesCount] = useState(0);
+  const [showMenu, setShowMenu] = useState(false);
   const isLong = post.content?.length > 120;
 
   useEffect(() => {
@@ -97,6 +101,13 @@ function ChannelPostCard({ post, currentUserId, isOwner }: { post: any; currentU
     }
   };
 
+  const handleDelete = async () => {
+    if (!confirm("Удалить пост?")) return;
+    await supabase.from("posts").delete().eq("id", post.id);
+    onDelete(post.id);
+    setShowMenu(false);
+  };
+
   const formatCount = (n: number) => {
     if (n >= 1000000) return (n / 1000000).toFixed(1) + " млн";
     if (n >= 1000) return (n / 1000).toFixed(1) + " тыс.";
@@ -121,7 +132,7 @@ function ChannelPostCard({ post, currentUserId, isOwner }: { post: any; currentU
         </div>
       )}
 
-      <div className="rounded-3xl overflow-hidden"
+      <div className="rounded-3xl overflow-hidden relative"
         style={{
           background: "linear-gradient(135deg, rgba(255,255,255,0.06) 0%, rgba(255,255,255,0.02) 100%)",
           backdropFilter: "blur(20px)",
@@ -129,8 +140,36 @@ function ChannelPostCard({ post, currentUserId, isOwner }: { post: any; currentU
           boxShadow: "0 10px 40px -5px rgba(123, 92, 255, 0.3)"
         }}>
 
+        {/* Три точки */}
+        <div className="absolute top-3 right-3 z-10">
+          <button onClick={() => setShowMenu(!showMenu)}
+            className="w-8 h-8 rounded-full flex items-center justify-center"
+            style={{ background: "rgba(255,255,255,0.08)" }}>
+            <span className="text-white/60 text-lg leading-none">···</span>
+          </button>
+          {showMenu && (
+            <>
+              <div className="fixed inset-0 z-10" onClick={() => setShowMenu(false)} />
+              <div className="absolute right-0 top-10 rounded-2xl overflow-hidden z-20 w-44"
+                style={{ background: "rgba(20,20,35,0.98)", border: "1px solid rgba(255,255,255,0.1)", boxShadow: "0 8px 32px rgba(0,0,0,0.4)" }}>
+                <button onClick={() => { onEdit(post); setShowMenu(false); }}
+                  className="w-full flex items-center gap-3 px-4 py-3 text-white/80 text-sm hover:bg-white/5 transition">
+                  <Edit3 className="w-4 h-4" />
+                  Редактировать
+                </button>
+                <div className="h-px bg-white/[0.06]" />
+                <button onClick={handleDelete}
+                  className="w-full flex items-center gap-3 px-4 py-3 text-red-400 text-sm hover:bg-white/5 transition">
+                  <X className="w-4 h-4" />
+                  Удалить пост
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+
         {post.content && (
-          <div className="px-4 pt-4 pb-2">
+          <div className="px-4 pt-4 pb-2 pr-12">
             <p className="text-white/90 text-sm leading-relaxed">
               {renderHashtags(post.content, router, expanded, isLong)}
             </p>
@@ -188,8 +227,7 @@ function ChannelPostCard({ post, currentUserId, isOwner }: { post: any; currentU
               style={{ background: btnStyle, border: "1px solid rgba(255,255,255,0.08)" }}>
               <Repeat2 className="w-4 h-4 text-white/70" strokeWidth={1.5} />
             </button>
-            <button
-              className="flex items-center justify-center px-3 py-2 rounded-2xl"
+            <button className="flex items-center justify-center px-3 py-2 rounded-2xl"
               style={{ background: btnStyle, border: "1px solid rgba(255,255,255,0.08)" }}
               onClick={() => {
                 const url = `${window.location.origin}/post/${post.id}`;
@@ -221,6 +259,8 @@ export default function MyChannelPage() {
   const [totalViews, setTotalViews] = useState(0);
   const [totalLikes, setTotalLikes] = useState(0);
   const [showAbout, setShowAbout] = useState(false);
+  const [editingPost, setEditingPost] = useState<any>(null);
+  const [editContent, setEditContent] = useState("");
   const avatarRef = useRef<HTMLInputElement>(null);
 
   const [cropSrc, setCropSrc] = useState<string | null>(null);
@@ -463,7 +503,14 @@ export default function MyChannelPage() {
             ) : (
               <div className="space-y-4">
                 {posts.map(post => (
-                  <ChannelPostCard key={post.id} post={post} currentUserId={currentUser?.id} isOwner={currentUser?.id === channel.owner_id} />
+                  <ChannelPostCard
+                    key={post.id}
+                    post={post}
+                    currentUserId={currentUser?.id}
+                    isOwner={currentUser?.id === channel.owner_id}
+                    onDelete={(id) => setPosts(prev => prev.filter(p => p.id !== id))}
+                    onEdit={(post) => { setEditingPost(post); setEditContent(post.content || ""); }}
+                  />
                 ))}
               </div>
             )}
@@ -471,22 +518,50 @@ export default function MyChannelPage() {
         </div>
       </div>
 
+      {/* Модалка редактирования */}
+      {editingPost && (
+        <div className="fixed inset-0 bg-black/70 z-50 flex items-end justify-center" onClick={() => setEditingPost(null)}>
+          <div className="w-full max-w-xl rounded-t-3xl pb-8 pt-6 px-6"
+            style={{ background: "rgba(15,15,25,0.98)", border: "1px solid rgba(255,255,255,0.08)" }}
+            onClick={e => e.stopPropagation()}>
+            <div className="w-10 h-1 rounded-full bg-white/20 mx-auto mb-6" />
+            <h2 className="text-white font-bold text-lg mb-4">Редактировать пост</h2>
+            <textarea value={editContent} onChange={e => setEditContent(e.target.value)} rows={5}
+              className="w-full px-4 py-3 rounded-2xl text-white text-sm placeholder-white/30 focus:outline-none resize-none"
+              style={{ background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.08)" }} />
+            <div className="flex gap-3 mt-4">
+              <button onClick={() => setEditingPost(null)}
+                className="flex-1 py-3 rounded-2xl text-white/40 text-sm"
+                style={{ background: "rgba(255,255,255,0.05)" }}>
+                Отмена
+              </button>
+              <button onClick={async () => {
+                await supabase.from("posts").update({ content: editContent }).eq("id", editingPost.id);
+                setPosts(prev => prev.map(p => p.id === editingPost.id ? { ...p, content: editContent } : p));
+                setEditingPost(null);
+              }} className="flex-1 py-3 rounded-2xl text-white font-semibold"
+                style={{ background: "linear-gradient(135deg, #3D5AFE, #7B5CFF)" }}>
+                Сохранить
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* О канале */}
       {showAbout && (
         <div className="fixed inset-0 bg-black/70 z-50 flex items-end justify-center" onClick={() => setShowAbout(false)}>
           <div className="w-full max-w-xl rounded-t-3xl pb-8 pt-6 px-6"
             style={{ background: "rgba(15,15,25,0.98)", border: "1px solid rgba(255,255,255,0.08)" }}
             onClick={e => e.stopPropagation()}>
-
             <div className="w-10 h-1 rounded-full bg-white/20 mx-auto mb-6" />
             <h2 className="text-white font-bold text-lg mb-4">О канале</h2>
-
             {channel.description && (
               <div className="mb-4">
                 <p className="text-white/40 text-xs uppercase tracking-wider mb-2">Описание</p>
                 <p className="text-white/70 text-sm leading-relaxed">{channel.description}</p>
               </div>
             )}
-
             {(channel.links || []).length > 0 && (
               <div className="mb-4">
                 <p className="text-white/40 text-xs uppercase tracking-wider mb-2">Ссылки</p>
@@ -501,7 +576,6 @@ export default function MyChannelPage() {
                 </div>
               </div>
             )}
-
             <div className="mb-4">
               <p className="text-white/40 text-xs uppercase tracking-wider mb-3">Статистика</p>
               <div className="grid grid-cols-2 gap-2">
@@ -519,7 +593,6 @@ export default function MyChannelPage() {
                 ))}
               </div>
             </div>
-
             <div className="space-y-2 text-sm text-white/40 mb-6">
               {channel.created_at && (
                 <p className="flex items-center gap-2">
@@ -540,26 +613,16 @@ export default function MyChannelPage() {
                 </p>
               )}
             </div>
-
-            <div className="space-y-2">
-              <button
-                className="w-full py-3 rounded-2xl text-white text-sm flex items-center justify-center gap-2"
-                style={{ background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.08)" }}
-                onClick={() => {
-                  const url = `${window.location.origin}/channel/${channel.id}`;
-                  try { navigator.clipboard.writeText(url); alert("Ссылка скопирована!"); } catch { alert(url); }
-                }}>
-                <Share2 className="w-4 h-4 text-white/60" />
-                Поделиться каналом
-              </button>
-              <button
-                className="w-full py-3 rounded-2xl text-red-400 text-sm flex items-center justify-center gap-2"
-                style={{ background: "rgba(255,50,50,0.06)", border: "1px solid rgba(255,50,50,0.12)" }}
-                onClick={() => { setShowAbout(false); alert("Жалоба отправлена"); }}>
-                <Flag className="w-4 h-4" />
-                Пожаловаться на канал
-              </button>
-            </div>
+            <button
+              className="w-full py-3 rounded-2xl text-white text-sm flex items-center justify-center gap-2"
+              style={{ background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.08)" }}
+              onClick={() => {
+                const url = `${window.location.origin}/channel/${channel.id}`;
+                try { navigator.clipboard.writeText(url); alert("Ссылка скопирована!"); } catch { alert(url); }
+              }}>
+              <Share2 className="w-4 h-4 text-white/60" />
+              Поделиться каналом
+            </button>
           </div>
         </div>
       )}
