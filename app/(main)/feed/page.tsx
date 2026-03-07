@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { MessageCircle, Repeat2, Eye, MoreHorizontal, X, ThumbsUp, ThumbsDown, Share2, Flag } from "lucide-react";
+import { MessageCircle, Repeat2, Eye, MoreHorizontal, X, ThumbsUp, ThumbsDown, Share2, Flag, Send } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 
 function timeAgo(date: string) {
@@ -33,6 +33,124 @@ export function renderHashtags(text: string, router: any, expanded: boolean, isL
   );
 }
 
+function CommentsSheet({ postId, currentUserId, onClose }: { postId: string; currentUserId: string; onClose: () => void }) {
+  const [comments, setComments] = useState<any[]>([]);
+  const [text, setText] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [sending, setSending] = useState(false);
+  const bottomRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const load = async () => {
+      const { data } = await supabase
+        .from("comments")
+        .select("*, profiles(id, full_name, username, avatar_url)")
+        .eq("post_id", postId)
+        .order("created_at", { ascending: true });
+      setComments(data || []);
+      setLoading(false);
+    };
+    load();
+  }, [postId]);
+
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [comments]);
+
+  const handleSend = async () => {
+    if (!text.trim() || !currentUserId) return;
+    setSending(true);
+    const { data } = await supabase
+      .from("comments")
+      .insert({ post_id: postId, user_id: currentUserId, content: text.trim() })
+      .select("*, profiles(id, full_name, username, avatar_url)")
+      .single();
+    if (data) setComments(prev => [...prev, data]);
+    setText("");
+    setSending(false);
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/70 z-50 flex items-end justify-center" onClick={onClose}>
+      <div className="w-full max-w-xl rounded-t-3xl flex flex-col"
+        style={{ background: "rgba(12,12,22,0.99)", border: "1px solid rgba(255,255,255,0.08)", maxHeight: "80vh" }}
+        onClick={e => e.stopPropagation()}>
+
+        <div className="w-10 h-1 rounded-full bg-white/20 mx-auto mt-4 mb-2 shrink-0" />
+        <div className="flex items-center justify-between px-5 pb-3 shrink-0">
+          <h2 className="text-white font-bold text-base">Комментарии</h2>
+          <button onClick={onClose} className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center">
+            <X className="w-4 h-4 text-white" />
+          </button>
+        </div>
+
+        <div className="h-px bg-white/[0.06] shrink-0" />
+
+        {/* Список комментариев */}
+        <div className="flex-1 overflow-y-auto px-5 py-3 space-y-4">
+          {loading ? (
+            <div className="flex justify-center py-8">
+              <div className="w-6 h-6 border-2 border-purple-500 border-t-transparent rounded-full animate-spin" />
+            </div>
+          ) : comments.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-12 text-white/20">
+              <MessageCircle className="w-10 h-10 mb-2" strokeWidth={1} />
+              <p className="text-sm">Пока нет комментариев</p>
+              <p className="text-xs mt-1">Будьте первым!</p>
+            </div>
+          ) : (
+            comments.map(comment => (
+              <div key={comment.id} className="flex gap-3">
+                <div className="w-8 h-8 rounded-full overflow-hidden shrink-0 ring-1 ring-white/10"
+                  style={{ background: "linear-gradient(135deg, #3D5AFE, #7B5CFF)" }}>
+                  {comment.profiles?.avatar_url ? (
+                    <img src={comment.profiles.avatar_url} alt="avatar" className="w-full h-full object-cover" />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center">
+                      <span className="text-white font-bold text-xs">{comment.profiles?.full_name?.[0] || "?"}</span>
+                    </div>
+                  )}
+                </div>
+                <div className="flex-1">
+                  <div className="flex items-baseline gap-2">
+                    <span className="text-white font-semibold text-xs">{comment.profiles?.full_name || "Пользователь"}</span>
+                    <span className="text-white/25 text-xs">{timeAgo(comment.created_at)}</span>
+                  </div>
+                  <p className="text-white/80 text-sm mt-0.5 leading-relaxed">{comment.content}</p>
+                </div>
+              </div>
+            ))
+          )}
+          <div ref={bottomRef} />
+        </div>
+
+        {/* Поле ввода */}
+        <div className="px-4 py-3 shrink-0" style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}>
+          {currentUserId ? (
+            <div className="flex gap-2 items-center">
+              <input
+                value={text}
+                onChange={e => setText(e.target.value)}
+                onKeyDown={e => e.key === "Enter" && !e.shiftKey && handleSend()}
+                placeholder="Написать комментарий..."
+                className="flex-1 px-4 py-2.5 rounded-2xl text-white text-sm placeholder-white/30 focus:outline-none"
+                style={{ background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.08)" }}
+              />
+              <button onClick={handleSend} disabled={!text.trim() || sending}
+                className="w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 disabled:opacity-40 transition"
+                style={{ background: "linear-gradient(135deg, #3D5AFE, #7B5CFF)" }}>
+                <Send className="w-4 h-4 text-white" />
+              </button>
+            </div>
+          ) : (
+            <p className="text-white/30 text-sm text-center py-2">Войдите чтобы комментировать</p>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function PostCard({ post, currentUserId }: { post: any; currentUserId: string }) {
   const router = useRouter();
   const [views, setViews] = useState(post.views || 0);
@@ -42,6 +160,8 @@ function PostCard({ post, currentUserId }: { post: any; currentUserId: string })
   const [liked, setLiked] = useState(false);
   const [disliked, setDisliked] = useState(false);
   const [likesCount, setLikesCount] = useState(0);
+  const [commentsCount, setCommentsCount] = useState(0);
+  const [showComments, setShowComments] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const isLong = post.content?.length > 120;
 
@@ -56,7 +176,9 @@ function PostCard({ post, currentUserId }: { post: any; currentUserId: string })
   useEffect(() => {
     const load = async () => {
       const { count: lc } = await supabase.from("likes").select("*", { count: "exact" }).eq("post_id", post.id).eq("type", "like");
+      const { count: cc } = await supabase.from("comments").select("*", { count: "exact" }).eq("post_id", post.id);
       setLikesCount(lc || 0);
+      setCommentsCount(cc || 0);
       if (currentUserId) {
         const { data: ld } = await supabase.from("likes").select("*").eq("post_id", post.id).eq("user_id", currentUserId).eq("type", "like").maybeSingle();
         const { data: dd } = await supabase.from("likes").select("*").eq("post_id", post.id).eq("user_id", currentUserId).eq("type", "dislike").maybeSingle();
@@ -125,6 +247,14 @@ function PostCard({ post, currentUserId }: { post: any; currentUserId: string })
             <img src={mediaPreview} alt="media" className="max-w-full max-h-full object-contain" />
           )}
         </div>
+      )}
+
+      {showComments && (
+        <CommentsSheet
+          postId={post.id}
+          currentUserId={currentUserId}
+          onClose={() => { setShowComments(false); supabase.from("comments").select("*", { count: "exact" }).eq("post_id", post.id).then(({ count }) => setCommentsCount(count || 0)); }}
+        />
       )}
 
       <div className="flex justify-center px-4">
@@ -226,10 +356,11 @@ function PostCard({ post, currentUserId }: { post: any; currentUserId: string })
               </div>
             </div>
             <div className="flex items-center gap-2">
-              <button className="flex items-center gap-1.5 px-3 py-2 rounded-2xl transition"
-                style={{ background: btnStyle, border: "1px solid rgba(255,255,255,0.08)" }}>
+              <button onClick={() => setShowComments(true)}
+                className="flex items-center gap-1.5 px-3 py-2 rounded-2xl transition"
+                style={{ background: showComments ? activeBtnStyle : btnStyle, border: "1px solid rgba(255,255,255,0.08)" }}>
                 <MessageCircle className="w-4 h-4 text-white/70" strokeWidth={1.5} />
-                <span className="text-xs text-white/70">0</span>
+                <span className="text-xs text-white/70">{formatCount(commentsCount)}</span>
               </button>
               <button className="flex items-center justify-center px-3 py-2 rounded-2xl transition"
                 style={{ background: btnStyle, border: "1px solid rgba(255,255,255,0.08)" }}>

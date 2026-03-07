@@ -211,10 +211,7 @@ function ChannelPostCard({ post, currentUserId, isOwner, channel, onDelete, onEd
             <p className="text-white font-semibold text-sm truncate">{channel?.name || "Канал"}</p>
             <p className="text-white/40 text-xs mt-0.5">{timeAgo(post.created_at)}</p>
           </div>
-          <PostMenu
-            onEdit={() => onEdit(post)}
-            onDelete={handleDelete}
-          />
+          <PostMenu onEdit={() => onEdit(post)} onDelete={handleDelete} />
         </div>
 
         {post.content && (
@@ -310,6 +307,10 @@ export default function MyChannelPage() {
   const [showAbout, setShowAbout] = useState(false);
   const [editingPost, setEditingPost] = useState<any>(null);
   const [editContent, setEditContent] = useState("");
+  const [editMediaRemoved, setEditMediaRemoved] = useState(false);
+  const [editNewMedia, setEditNewMedia] = useState<File | null>(null);
+  const [editSaving, setEditSaving] = useState(false);
+  const editMediaRef = useRef<HTMLInputElement>(null);
   const avatarRef = useRef<HTMLInputElement>(null);
 
   const [cropSrc, setCropSrc] = useState<string | null>(null);
@@ -381,6 +382,39 @@ export default function MyChannelPage() {
     if (error) { alert("Ошибка: " + error.message); setSaving(false); return; }
     if (ch) { setChannel(ch); setCreating(false); }
     setSaving(false);
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editingPost) return;
+    setEditSaving(true);
+
+    let imageUrl = editingPost.image_url;
+    if (editMediaRemoved && !editNewMedia) imageUrl = null;
+    if (editNewMedia) {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) { setEditSaving(false); return; }
+      const ext = editNewMedia.name.split(".").pop();
+      const path = `posts/${session.user.id}/${Date.now()}.${ext}`;
+      await supabase.storage.from("images").upload(path, editNewMedia);
+      const { data: { publicUrl } } = supabase.storage.from("images").getPublicUrl(path);
+      imageUrl = publicUrl;
+    }
+
+    await supabase.from("posts").update({ content: editContent, image_url: imageUrl }).eq("id", editingPost.id);
+
+    await supabase.from("post_hashtags").delete().eq("post_id", editingPost.id);
+    const newTags = [...new Set((editContent.match(/#[а-яёa-z0-9_]+/gi) || []).map((t: string) => t.toLowerCase()))];
+    for (const tag of newTags) {
+      const cleanTag = tag.slice(1);
+      await supabase.from("post_hashtags").insert({ post_id: editingPost.id, tag: cleanTag });
+      await supabase.from("hashtags").upsert({ tag: cleanTag }, { onConflict: "tag" });
+    }
+
+    setPosts(prev => prev.map(p => p.id === editingPost.id ? { ...p, content: editContent, image_url: imageUrl } : p));
+    setEditingPost(null);
+    setEditMediaRemoved(false);
+    setEditNewMedia(null);
+    setEditSaving(false);
   };
 
   const formatDate = (date: string) => new Date(date).toLocaleDateString("ru-RU", { day: "numeric", month: "long", year: "numeric" });
@@ -514,7 +548,6 @@ export default function MyChannelPage() {
                 Редактировать
               </button>
             </div>
-
             <h1 className="text-white text-xl font-bold mt-3">{channel.name}</h1>
             <p className="text-white/40 text-sm">@{channel.username}</p>
             <div className="flex items-center gap-3 mt-2 text-sm text-white/40">
@@ -522,11 +555,9 @@ export default function MyChannelPage() {
               <span>·</span>
               <span>{posts.length} постов</span>
             </div>
-
             {channel.description && (
               <p className="text-white/60 text-sm mt-3 leading-relaxed">{channel.description}</p>
             )}
-
             <button onClick={() => setShowAbout(true)} className="mt-3 text-blue-400 text-sm flex items-center gap-1">
               О канале... <ChevronDown className="w-3 h-3" />
             </button>
@@ -559,7 +590,12 @@ export default function MyChannelPage() {
                     currentUserId={currentUser?.id}
                     isOwner={currentUser?.id === channel.owner_id}
                     onDelete={(id) => setPosts(prev => prev.filter(p => p.id !== id))}
-                    onEdit={(post) => { setEditingPost(post); setEditContent(post.content || ""); }}
+                    onEdit={(post) => {
+                      setEditingPost(post);
+                      setEditContent(post.content || "");
+                      setEditMediaRemoved(false);
+                      setEditNewMedia(null);
+                    }}
                   />
                 ))}
               </div>
@@ -568,6 +604,7 @@ export default function MyChannelPage() {
         </div>
       </div>
 
+      {/* Модалка редактирования */}
       {editingPost && (
         <div className="fixed inset-0 bg-black/70 z-50 flex items-end justify-center" onClick={() => setEditingPost(null)}>
           <div className="w-full max-w-xl rounded-t-3xl pb-8 pt-6 px-6"
@@ -575,48 +612,74 @@ export default function MyChannelPage() {
             onClick={e => e.stopPropagation()}>
             <div className="w-10 h-1 rounded-full bg-white/20 mx-auto mb-6" />
             <h2 className="text-white font-bold text-lg mb-4">Редактировать пост</h2>
-            <textarea value={editContent} onChange={e => setEditContent(e.target.value)} rows={5}
-              className="w-full px-4 py-3 rounded-2xl text-white text-sm placeholder-white/30 focus:outline-none resize-none"
+
+            <textarea value={editContent} onChange={e => setEditContent(e.target.value)} rows={4}
+              placeholder="Текст поста..."
+              className="w-full px-4 py-3 rounded-2xl text-white text-sm placeholder-white/30 focus:outline-none resize-none mb-3"
               style={{ background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.08)" }} />
-            <div className="flex gap-3 mt-4">
-              <button onClick={() => setEditingPost(null)}
+
+            {/* Текущее медиа */}
+            {editingPost.image_url && !editMediaRemoved && (
+              <div className="relative mb-3">
+                {editingPost.image_url.match(/\.(mp4|mov|mpeg|webm)$/i) ? (
+                  <video src={editingPost.image_url} className="w-full rounded-2xl object-contain" style={{ maxHeight: "200px" }} />
+                ) : (
+                  <img src={editingPost.image_url} alt="media" className="w-full rounded-2xl object-contain" style={{ maxHeight: "200px" }} />
+                )}
+                <button onClick={() => setEditMediaRemoved(true)}
+                  className="absolute top-2 right-2 w-8 h-8 rounded-full bg-black/70 flex items-center justify-center">
+                  <X className="w-4 h-4 text-white" />
+                </button>
+              </div>
+            )}
+
+            {/* Новое медиа */}
+            {editNewMedia && (
+              <div className="relative mb-3">
+                {editNewMedia.type.startsWith("video") ? (
+                  <video src={URL.createObjectURL(editNewMedia)} className="w-full rounded-2xl object-contain" style={{ maxHeight: "200px" }} />
+                ) : (
+                  <img src={URL.createObjectURL(editNewMedia)} alt="new" className="w-full rounded-2xl object-contain" style={{ maxHeight: "200px" }} />
+                )}
+                <button onClick={() => { setEditNewMedia(null); setEditMediaRemoved(false); }}
+                  className="absolute top-2 right-2 w-8 h-8 rounded-full bg-black/70 flex items-center justify-center">
+                  <X className="w-4 h-4 text-white" />
+                </button>
+              </div>
+            )}
+
+            {/* Кнопка добавить медиа */}
+            {!editNewMedia && (
+              <button onClick={() => editMediaRef.current?.click()}
+                className="w-full py-2.5 rounded-2xl text-white/50 text-sm flex items-center justify-center gap-2 mb-3"
+                style={{ background: "rgba(255,255,255,0.05)", border: "1px dashed rgba(255,255,255,0.15)" }}>
+                <Camera className="w-4 h-4" />
+                {editMediaRemoved || !editingPost.image_url ? "Добавить фото/видео" : "Заменить фото/видео"}
+              </button>
+            )}
+            <input ref={editMediaRef} type="file" accept="image/*,video/*" className="hidden"
+              onChange={e => {
+                const f = e.target.files?.[0];
+                if (f) { setEditNewMedia(f); setEditMediaRemoved(true); }
+              }} />
+
+            <div className="flex gap-3 mt-2">
+              <button onClick={() => { setEditingPost(null); setEditMediaRemoved(false); setEditNewMedia(null); }}
                 className="flex-1 py-3 rounded-2xl text-white/40 text-sm"
                 style={{ background: "rgba(255,255,255,0.05)" }}>
                 Отмена
               </button>
-             <button onClick={async () => {
-  await supabase.from("posts").update({ content: editContent }).eq("id", editingPost.id);
-  
-  // Обновляем хештеги
-  await supabase.from("post_hashtags").delete().eq("post_id", editingPost.id);
-  const newTags = [...new Set((editContent.match(/#[а-яёa-z0-9_]+/gi) || []).map(t => t.toLowerCase()))];
-  if (newTags.length > 0) {
-    for (const tag of newTags) {
-      const cleanTag = tag.slice(1);
-      await supabase.from("post_hashtags").insert({ post_id: editingPost.id, tag: cleanTag });
-      await supabase.from("hashtags").upsert({ tag: cleanTag }, { onConflict: "tag" });
-      await supabase.from("hashtags").update({
-        posts_count: (await supabase.from("post_hashtags").select("*", { count: "exact" }).eq("tag", cleanTag)).count || 0
-      }).eq("tag", cleanTag);
-    }
-  }
-
-  setPosts(prev => prev.map(p => p.id === editingPost.id ? { ...p, content: editContent } : p));
-  setEditingPost(null);
-}} className="flex-1 py-3 rounded-2xl text-white font-semibold"
-  style={{ background: "linear-gradient(135deg, #3D5AFE, #7B5CFF)" }}>
-  Сохранить
-</button>
-```
-
-Сохрани **Command + S** и задеплой:
-```
-cd ~/Desktop/Codex\ приложения/neva && git add . && git commit -m "fix edit save" && git push
+              <button onClick={handleSaveEdit} disabled={editSaving}
+                className="flex-1 py-3 rounded-2xl text-white font-semibold disabled:opacity-40"
+                style={{ background: "linear-gradient(135deg, #3D5AFE, #7B5CFF)" }}>
+                {editSaving ? "Сохраняем..." : "Сохранить"}
+              </button>
             </div>
           </div>
         </div>
       )}
 
+      {/* О канале */}
       {showAbout && (
         <div className="fixed inset-0 bg-black/70 z-50 flex items-end justify-center" onClick={() => setShowAbout(false)}>
           <div className="w-full max-w-xl rounded-t-3xl pb-8 pt-6 px-6"
