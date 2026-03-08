@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { MessageCircle, Repeat2, Eye, MoreHorizontal, X, ThumbsUp, ThumbsDown, Share2, Flag, Send } from "lucide-react";
+import { MessageCircle, Repeat2, Eye, MoreHorizontal, X, ThumbsUp, ThumbsDown, Share2, Flag, Send, Mic, MicOff, Play, Pause, CornerDownRight } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 
 function timeAgo(date: string) {
@@ -33,47 +33,293 @@ export function renderHashtags(text: string, router: any, expanded: boolean, isL
   );
 }
 
-function CommentsSheet({ postId, currentUserId, onClose }: { postId: string; currentUserId: string; onClose: () => void }) {
+function AudioPlayer({ url }: { url: string }) {
+  const [playing, setPlaying] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [duration, setDuration] = useState(0);
+  const audioRef = useRef<HTMLAudioElement>(null);
+
+  const toggle = () => {
+    if (!audioRef.current) return;
+    if (playing) { audioRef.current.pause(); setPlaying(false); }
+    else { audioRef.current.play(); setPlaying(true); }
+  };
+
+  return (
+    <div className="flex items-center gap-2 px-3 py-2 rounded-2xl mt-1" style={{ background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.08)" }}>
+      <audio ref={audioRef} src={url}
+        onTimeUpdate={() => { if (audioRef.current) setProgress(audioRef.current.currentTime / (audioRef.current.duration || 1) * 100); }}
+        onLoadedMetadata={() => { if (audioRef.current) setDuration(audioRef.current.duration); }}
+        onEnded={() => { setPlaying(false); setProgress(0); }} />
+      <button onClick={toggle} className="w-7 h-7 rounded-full flex items-center justify-center shrink-0"
+        style={{ background: "linear-gradient(135deg, #3D5AFE, #7B5CFF)" }}>
+        {playing ? <Pause className="w-3 h-3 text-white" /> : <Play className="w-3 h-3 text-white ml-0.5" />}
+      </button>
+      <div className="flex-1 h-1 rounded-full bg-white/10 relative">
+        <div className="h-full rounded-full" style={{ width: `${progress}%`, background: "linear-gradient(135deg, #3D5AFE, #7B5CFF)" }} />
+      </div>
+      <span className="text-white/30 text-xs shrink-0">{Math.floor(duration)}с</span>
+    </div>
+  );
+}
+
+function CommentItem({ comment, currentUserId, postId, depth = 0, onReplyAdded }: {
+  comment: any; currentUserId: string; postId: string; depth?: number; onReplyAdded?: (reply: any, parentId: string) => void;
+}) {
+  const [liked, setLiked] = useState(false);
+  const [likesCount, setLikesCount] = useState(comment.likes_count || 0);
+  const [showReply, setShowReply] = useState(false);
+  const [replyText, setReplyText] = useState("");
+  const [sending, setSending] = useState(false);
+  const [showMenu, setShowMenu] = useState(false);
+  const [recording, setRecording] = useState(false);
+  const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const chunksRef = useRef<Blob[]>([]);
+
+  useEffect(() => {
+    if (!currentUserId) return;
+    supabase.from("comment_likes").select("*").eq("comment_id", comment.id).eq("user_id", currentUserId).maybeSingle()
+      .then(({ data }) => setLiked(!!data));
+  }, [comment.id, currentUserId]);
+
+  const handleLike = async () => {
+    if (!currentUserId) return;
+    if (liked) {
+      await supabase.from("comment_likes").delete().eq("comment_id", comment.id).eq("user_id", currentUserId);
+      await supabase.from("comments").update({ likes_count: likesCount - 1 }).eq("id", comment.id);
+      setLiked(false); setLikesCount((c: number) => c - 1);
+    } else {
+      await supabase.from("comment_likes").insert({ comment_id: comment.id, user_id: currentUserId });
+      await supabase.from("comments").update({ likes_count: likesCount + 1 }).eq("id", comment.id);
+      setLiked(true); setLikesCount((c: number) => c + 1);
+    }
+  };
+
+  const startRecording = async () => {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    const mr = new MediaRecorder(stream);
+    chunksRef.current = [];
+    mr.ondataavailable = e => chunksRef.current.push(e.data);
+    mr.onstop = () => setAudioBlob(new Blob(chunksRef.current, { type: "audio/webm" }));
+    mr.start();
+    mediaRecorderRef.current = mr;
+    setRecording(true);
+  };
+
+  const stopRecording = () => {
+    mediaRecorderRef.current?.stop();
+    setRecording(false);
+  };
+
+  const handleSendReply = async () => {
+    if ((!replyText.trim() && !audioBlob) || !currentUserId) return;
+    setSending(true);
+    let audioUrl = null;
+    if (audioBlob) {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) {
+        const path = `comments/${session.user.id}/${Date.now()}.webm`;
+        await supabase.storage.from("images").upload(path, audioBlob, { contentType: "audio/webm" });
+        const { data: { publicUrl } } = supabase.storage.from("images").getPublicUrl(path);
+        audioUrl = publicUrl;
+      }
+    }
+    const { data } = await supabase.from("comments")
+      .insert({ post_id: postId, user_id: currentUserId, content: replyText.trim(), parent_id: comment.id, audio_url: audioUrl })
+      .select("*, profiles(id, full_name, username, avatar_url)")
+      .single();
+    if (data && onReplyAdded) onReplyAdded(data, comment.id);
+    setReplyText(""); setAudioBlob(null); setShowReply(false); setSending(false);
+  };
+
+  return (
+    <div className={depth > 0 ? "ml-8 mt-3" : ""}>
+      <div className="flex gap-3">
+        <div className="w-8 h-8 rounded-full overflow-hidden shrink-0 ring-1 ring-white/10"
+          style={{ background: "linear-gradient(135deg, #3D5AFE, #7B5CFF)" }}>
+          {comment.profiles?.avatar_url ? (
+            <img src={comment.profiles.avatar_url} alt="avatar" className="w-full h-full object-cover" />
+          ) : (
+            <div className="w-full h-full flex items-center justify-center">
+              <span className="text-white font-bold text-xs">{comment.profiles?.full_name?.[0] || "?"}</span>
+            </div>
+          )}
+        </div>
+        <div className="flex-1">
+          <div className="flex items-baseline justify-between">
+            <div className="flex items-baseline gap-2">
+              <span className="text-white font-semibold text-xs">{comment.profiles?.full_name || "Пользователь"}</span>
+              <span className="text-white/25 text-xs">{timeAgo(comment.created_at)}</span>
+            </div>
+            <div className="relative">
+              <button onClick={() => setShowMenu(!showMenu)} className="w-6 h-6 flex items-center justify-center rounded-full hover:bg-white/10">
+                <MoreHorizontal className="w-3.5 h-3.5 text-white/30" />
+              </button>
+              {showMenu && (
+                <div className="absolute right-0 top-7 z-30 w-40 rounded-2xl overflow-hidden border border-white/10"
+                  style={{ background: "rgba(20,20,40,0.97)", backdropFilter: "blur(20px)" }}>
+                  <button onClick={() => { setShowMenu(false); alert("Жалоба отправлена"); }}
+                    className="w-full px-4 py-3 text-left text-red-400 text-sm hover:bg-white/5 flex items-center gap-2">
+                    <Flag className="w-3.5 h-3.5 shrink-0" />
+                    Пожаловаться
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+          {comment.content && <p className="text-white/80 text-sm mt-0.5 leading-relaxed">{comment.content}</p>}
+          {comment.audio_url && <AudioPlayer url={comment.audio_url} />}
+          <div className="flex items-center gap-3 mt-1.5">
+            <button onClick={handleLike} className="flex items-center gap-1 transition">
+              <ThumbsUp className={`w-3.5 h-3.5 ${liked ? "text-blue-400" : "text-white/30"}`} strokeWidth={1.5} />
+              {likesCount > 0 && <span className={`text-xs ${liked ? "text-blue-400" : "text-white/30"}`}>{likesCount}</span>}
+            </button>
+            {depth === 0 && (
+              <button onClick={() => setShowReply(!showReply)} className="flex items-center gap-1 text-white/30 hover:text-white/60 transition">
+                <CornerDownRight className="w-3.5 h-3.5" strokeWidth={1.5} />
+                <span className="text-xs">Ответить</span>
+              </button>
+            )}
+          </div>
+
+          {showReply && (
+            <div className="mt-2">
+              {audioBlob ? (
+                <div className="flex items-center gap-2 mb-2">
+                  <AudioPlayer url={URL.createObjectURL(audioBlob)} />
+                  <button onClick={() => setAudioBlob(null)} className="w-7 h-7 rounded-full bg-white/10 flex items-center justify-center shrink-0">
+                    <X className="w-3.5 h-3.5 text-white/60" />
+                  </button>
+                </div>
+              ) : (
+                <div className="flex gap-2 items-center">
+                  <input value={replyText} onChange={e => setReplyText(e.target.value)}
+                    onKeyDown={e => e.key === "Enter" && handleSendReply()}
+                    placeholder="Ответить..."
+                    className="flex-1 px-3 py-2 rounded-2xl text-white text-xs placeholder-white/30 focus:outline-none"
+                    style={{ background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.08)" }} />
+                  <button onClick={recording ? stopRecording : startRecording}
+                    className="w-8 h-8 rounded-2xl flex items-center justify-center shrink-0"
+                    style={{ background: recording ? "rgba(255,60,60,0.3)" : "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.08)" }}>
+                    {recording ? <MicOff className="w-3.5 h-3.5 text-red-400" /> : <Mic className="w-3.5 h-3.5 text-white/50" />}
+                  </button>
+                </div>
+              )}
+              <div className="flex gap-2 mt-1.5">
+                <button onClick={() => { setShowReply(false); setAudioBlob(null); setReplyText(""); }}
+                  className="text-white/30 text-xs px-3 py-1.5 rounded-xl" style={{ background: "rgba(255,255,255,0.04)" }}>
+                  Отмена
+                </button>
+                <button onClick={handleSendReply} disabled={(!replyText.trim() && !audioBlob) || sending}
+                  className="flex items-center gap-1 text-white text-xs px-3 py-1.5 rounded-xl disabled:opacity-40"
+                  style={{ background: "linear-gradient(135deg, #3D5AFE, #7B5CFF)" }}>
+                  <Send className="w-3 h-3" />
+                  {sending ? "..." : "Отправить"}
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+      {(comment.replies || []).map((reply: any) => (
+        <CommentItem key={reply.id} comment={reply} currentUserId={currentUserId} postId={postId} depth={1} />
+      ))}
+    </div>
+  );
+}
+
+function CommentsSheet({ postId, currentUserId, onClose, onCountChange }: {
+  postId: string; currentUserId: string; onClose: () => void; onCountChange: (n: number) => void;
+}) {
   const [comments, setComments] = useState<any[]>([]);
   const [text, setText] = useState("");
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
+  const [recording, setRecording] = useState(false);
+  const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const chunksRef = useRef<Blob[]>([]);
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const load = async () => {
-      const { data } = await supabase
-        .from("comments")
+      const { data } = await supabase.from("comments")
         .select("*, profiles(id, full_name, username, avatar_url)")
-        .eq("post_id", postId)
+        .eq("post_id", postId).is("parent_id", null)
         .order("created_at", { ascending: true });
-      setComments(data || []);
+
+      const topLevel = data || [];
+      const withReplies = await Promise.all(topLevel.map(async (c: any) => {
+        const { data: replies } = await supabase.from("comments")
+          .select("*, profiles(id, full_name, username, avatar_url)")
+          .eq("parent_id", c.id).order("created_at", { ascending: true });
+        return { ...c, replies: replies || [] };
+      }));
+      setComments(withReplies);
+      const total = withReplies.reduce((acc, c) => acc + 1 + (c.replies?.length || 0), 0);
+      onCountChange(total);
       setLoading(false);
     };
     load();
   }, [postId]);
 
-  useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [comments]);
+  useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: "smooth" }); }, [comments]);
+
+  const startRecording = async () => {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    const mr = new MediaRecorder(stream);
+    chunksRef.current = [];
+    mr.ondataavailable = e => chunksRef.current.push(e.data);
+    mr.onstop = () => setAudioBlob(new Blob(chunksRef.current, { type: "audio/webm" }));
+    mr.start();
+    mediaRecorderRef.current = mr;
+    setRecording(true);
+  };
+
+  const stopRecording = () => { mediaRecorderRef.current?.stop(); setRecording(false); };
 
   const handleSend = async () => {
-    if (!text.trim() || !currentUserId) return;
+    if ((!text.trim() && !audioBlob) || !currentUserId) return;
     setSending(true);
-    const { data } = await supabase
-      .from("comments")
-      .insert({ post_id: postId, user_id: currentUserId, content: text.trim() })
-      .select("*, profiles(id, full_name, username, avatar_url)")
-      .single();
-    if (data) setComments(prev => [...prev, data]);
-    setText("");
-    setSending(false);
+    let audioUrl = null;
+    if (audioBlob) {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) {
+        const path = `comments/${session.user.id}/${Date.now()}.webm`;
+        await supabase.storage.from("images").upload(path, audioBlob, { contentType: "audio/webm" });
+        const { data: { publicUrl } } = supabase.storage.from("images").getPublicUrl(path);
+        audioUrl = publicUrl;
+      }
+    }
+    const { data } = await supabase.from("comments")
+      .insert({ post_id: postId, user_id: currentUserId, content: text.trim(), audio_url: audioUrl })
+      .select("*, profiles(id, full_name, username, avatar_url)").single();
+    if (data) {
+      const newComment = { ...data, replies: [] };
+      setComments(prev => {
+        const updated = [...prev, newComment];
+        const total = updated.reduce((acc, c) => acc + 1 + (c.replies?.length || 0), 0);
+        onCountChange(total);
+        return updated;
+      });
+    }
+    setText(""); setAudioBlob(null); setSending(false);
+  };
+
+  const handleReplyAdded = (reply: any, parentId: string) => {
+    setComments(prev => {
+      const updated = prev.map(c => c.id === parentId ? { ...c, replies: [...(c.replies || []), reply] } : c);
+      const total = updated.reduce((acc, c) => acc + 1 + (c.replies?.length || 0), 0);
+      onCountChange(total);
+      return updated;
+    });
   };
 
   return (
     <div className="fixed inset-0 bg-black/70 z-50 flex items-end justify-center" onClick={onClose}>
       <div className="w-full max-w-xl rounded-t-3xl flex flex-col"
-        style={{ background: "rgba(12,12,22,0.99)", border: "1px solid rgba(255,255,255,0.08)", maxHeight: "80vh" }}
+        style={{ background: "rgba(12,12,22,0.99)", border: "1px solid rgba(255,255,255,0.08)", maxHeight: "82vh" }}
         onClick={e => e.stopPropagation()}>
 
         <div className="w-10 h-1 rounded-full bg-white/20 mx-auto mt-4 mb-2 shrink-0" />
@@ -83,11 +329,9 @@ function CommentsSheet({ postId, currentUserId, onClose }: { postId: string; cur
             <X className="w-4 h-4 text-white" />
           </button>
         </div>
-
         <div className="h-px bg-white/[0.06] shrink-0" />
 
-        {/* Список комментариев */}
-        <div className="flex-1 overflow-y-auto px-5 py-3 space-y-4">
+        <div className="flex-1 overflow-y-auto px-5 py-4 space-y-5">
           {loading ? (
             <div className="flex justify-center py-8">
               <div className="w-6 h-6 border-2 border-purple-500 border-t-transparent rounded-full animate-spin" />
@@ -100,48 +344,42 @@ function CommentsSheet({ postId, currentUserId, onClose }: { postId: string; cur
             </div>
           ) : (
             comments.map(comment => (
-              <div key={comment.id} className="flex gap-3">
-                <div className="w-8 h-8 rounded-full overflow-hidden shrink-0 ring-1 ring-white/10"
-                  style={{ background: "linear-gradient(135deg, #3D5AFE, #7B5CFF)" }}>
-                  {comment.profiles?.avatar_url ? (
-                    <img src={comment.profiles.avatar_url} alt="avatar" className="w-full h-full object-cover" />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center">
-                      <span className="text-white font-bold text-xs">{comment.profiles?.full_name?.[0] || "?"}</span>
-                    </div>
-                  )}
-                </div>
-                <div className="flex-1">
-                  <div className="flex items-baseline gap-2">
-                    <span className="text-white font-semibold text-xs">{comment.profiles?.full_name || "Пользователь"}</span>
-                    <span className="text-white/25 text-xs">{timeAgo(comment.created_at)}</span>
-                  </div>
-                  <p className="text-white/80 text-sm mt-0.5 leading-relaxed">{comment.content}</p>
-                </div>
-              </div>
+              <CommentItem key={comment.id} comment={comment} currentUserId={currentUserId}
+                postId={postId} depth={0} onReplyAdded={handleReplyAdded} />
             ))
           )}
           <div ref={bottomRef} />
         </div>
 
-        {/* Поле ввода */}
         <div className="px-4 py-3 shrink-0" style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}>
           {currentUserId ? (
-            <div className="flex gap-2 items-center">
-              <input
-                value={text}
-                onChange={e => setText(e.target.value)}
-                onKeyDown={e => e.key === "Enter" && !e.shiftKey && handleSend()}
-                placeholder="Написать комментарий..."
-                className="flex-1 px-4 py-2.5 rounded-2xl text-white text-sm placeholder-white/30 focus:outline-none"
-                style={{ background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.08)" }}
-              />
-              <button onClick={handleSend} disabled={!text.trim() || sending}
-                className="w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 disabled:opacity-40 transition"
-                style={{ background: "linear-gradient(135deg, #3D5AFE, #7B5CFF)" }}>
-                <Send className="w-4 h-4 text-white" />
-              </button>
-            </div>
+            <>
+              {audioBlob && (
+                <div className="flex items-center gap-2 mb-2">
+                  <AudioPlayer url={URL.createObjectURL(audioBlob)} />
+                  <button onClick={() => setAudioBlob(null)} className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center shrink-0">
+                    <X className="w-4 h-4 text-white/60" />
+                  </button>
+                </div>
+              )}
+              <div className="flex gap-2 items-center">
+                <input value={text} onChange={e => setText(e.target.value)}
+                  onKeyDown={e => e.key === "Enter" && !e.shiftKey && handleSend()}
+                  placeholder="Написать комментарий..."
+                  className="flex-1 px-4 py-2.5 rounded-2xl text-white text-sm placeholder-white/30 focus:outline-none"
+                  style={{ background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.08)" }} />
+                <button onClick={recording ? stopRecording : startRecording}
+                  className="w-10 h-10 rounded-2xl flex items-center justify-center shrink-0"
+                  style={{ background: recording ? "rgba(255,60,60,0.3)" : "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.08)" }}>
+                  {recording ? <MicOff className="w-4 h-4 text-red-400" /> : <Mic className="w-4 h-4 text-white/50" />}
+                </button>
+                <button onClick={handleSend} disabled={(!text.trim() && !audioBlob) || sending}
+                  className="w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 disabled:opacity-40"
+                  style={{ background: "linear-gradient(135deg, #3D5AFE, #7B5CFF)" }}>
+                  <Send className="w-4 h-4 text-white" />
+                </button>
+              </div>
+            </>
           ) : (
             <p className="text-white/30 text-sm text-center py-2">Войдите чтобы комментировать</p>
           )}
@@ -182,8 +420,7 @@ function PostCard({ post, currentUserId }: { post: any; currentUserId: string })
       if (currentUserId) {
         const { data: ld } = await supabase.from("likes").select("*").eq("post_id", post.id).eq("user_id", currentUserId).eq("type", "like").maybeSingle();
         const { data: dd } = await supabase.from("likes").select("*").eq("post_id", post.id).eq("user_id", currentUserId).eq("type", "dislike").maybeSingle();
-        setLiked(!!ld);
-        setDisliked(!!dd);
+        setLiked(!!ld); setDisliked(!!dd);
       }
     };
     load();
@@ -250,11 +487,9 @@ function PostCard({ post, currentUserId }: { post: any; currentUserId: string })
       )}
 
       {showComments && (
-        <CommentsSheet
-          postId={post.id}
-          currentUserId={currentUserId}
-          onClose={() => { setShowComments(false); supabase.from("comments").select("*", { count: "exact" }).eq("post_id", post.id).then(({ count }) => setCommentsCount(count || 0)); }}
-        />
+        <CommentsSheet postId={post.id} currentUserId={currentUserId}
+          onClose={() => setShowComments(false)}
+          onCountChange={(n) => setCommentsCount(n)} />
       )}
 
       <div className="flex justify-center px-4">
@@ -296,8 +531,7 @@ function PostCard({ post, currentUserId }: { post: any; currentUserId: string })
               {showMenu && (
                 <div className="absolute right-0 top-10 z-20 w-40 rounded-2xl overflow-hidden border border-white/10"
                   style={{ background: "rgba(20, 20, 40, 0.95)", backdropFilter: "blur(20px)" }}>
-                  <button
-                    onClick={() => { setShowMenu(false); alert("Жалоба отправлена"); }}
+                  <button onClick={() => { setShowMenu(false); alert("Жалоба отправлена"); }}
                     className="w-full px-4 py-3 text-left text-red-400 text-sm hover:bg-white/5 transition flex items-center gap-2">
                     <Flag className="w-4 h-4 text-red-400 shrink-0" strokeWidth={1.5} />
                     <span>Пожаловаться</span>
@@ -366,8 +600,7 @@ function PostCard({ post, currentUserId }: { post: any; currentUserId: string })
                 style={{ background: btnStyle, border: "1px solid rgba(255,255,255,0.08)" }}>
                 <Repeat2 className="w-4 h-4 text-white/70" strokeWidth={1.5} />
               </button>
-              <button
-                className="flex items-center justify-center px-3 py-2 rounded-2xl transition"
+              <button className="flex items-center justify-center px-3 py-2 rounded-2xl transition"
                 style={{ background: btnStyle, border: "1px solid rgba(255,255,255,0.08)" }}
                 onClick={() => {
                   const url = `${window.location.origin}/post/${post.id}`;
@@ -392,38 +625,22 @@ export default function FeedPage() {
     const load = async () => {
       const { data: { user } } = await supabase.auth.getUser();
       setCurrentUser(user);
-
-      const { data } = await supabase
-        .from("posts")
-        .select(`*, profiles(id, full_name, username, avatar_url)`)
-        .order("created_at", { ascending: false });
-
-      const { data: activeChannels } = await supabase
-        .from("channels")
-        .select("id, name, avatar_url, owner_id")
-        .is("deleted_at", null);
-
+      const { data } = await supabase.from("posts").select(`*, profiles(id, full_name, username, avatar_url)`).order("created_at", { ascending: false });
+      const { data: activeChannels } = await supabase.from("channels").select("id, name, avatar_url, owner_id").is("deleted_at", null);
       const channelMap: Record<string, any> = {};
       (activeChannels || []).forEach((c: any) => { channelMap[c.owner_id] = c; });
-
-      const postsWithChannels = (data || []).map((p: any) => ({
-        ...p,
-        channels: channelMap[p.user_id] || null
-      }));
-
+      const postsWithChannels = (data || []).map((p: any) => ({ ...p, channels: channelMap[p.user_id] || null }));
       setPosts(postsWithChannels);
       setLoading(false);
     };
     load();
   }, []);
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen bg-[#0a0a0f]">
-        <div className="w-8 h-8 border-2 border-purple-500 border-t-transparent rounded-full animate-spin" />
-      </div>
-    );
-  }
+  if (loading) return (
+    <div className="flex items-center justify-center min-h-screen bg-[#0a0a0f]">
+      <div className="w-8 h-8 border-2 border-purple-500 border-t-transparent rounded-full animate-spin" />
+    </div>
+  );
 
   return (
     <div className="min-h-screen" style={{
