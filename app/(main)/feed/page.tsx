@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { MessageCircle, Repeat2, Eye, MoreHorizontal, X, ThumbsUp, ThumbsDown, Share2, Flag, Send, Mic, Play, Pause, CornerDownRight, ChevronDown, ChevronUp } from "lucide-react";
+import { MessageCircle, Repeat2, Eye, MoreHorizontal, X, ThumbsUp, ThumbsDown, Share2, Flag, Send, Mic, Play, Pause, CornerDownRight, ChevronDown, ChevronUp, ChevronRight } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 
 function timeAgo(date: string) {
@@ -30,6 +30,91 @@ export function renderHashtags(text: string, router: any, expanded: boolean, isL
         {part}
       </span>
     ) : <span key={i}>{part}</span>
+  );
+}
+
+const REPORT_REASONS = [
+  "Контент сексуального характера",
+  "Жестокие или отталкивающие сцены",
+  "Оскорбления или проявления нетерпимости",
+  "Домогательства или издевательства",
+  "Вредные или опасные действия",
+  "Самоубийство, причинение себе вреда и расстройства пищевого поведения",
+];
+
+function ReportModal({ targetId, type, reportedUserId, currentUserId, onClose }: {
+  targetId: string; type: "post" | "comment"; reportedUserId?: string; currentUserId: string; onClose: () => void;
+}) {
+  const [step, setStep] = useState<"reason" | "done">("reason");
+  const [selected, setSelected] = useState("");
+  const [sending, setSending] = useState(false);
+
+  const handleSend = async (reason: string) => {
+    if (!currentUserId) return;
+    setSending(true);
+    setSelected(reason);
+    await supabase.from("reports").insert({
+      reporter_id: currentUserId,
+      reported_user_id: reportedUserId || null,
+      post_id: type === "post" ? targetId : null,
+      comment_id: type === "comment" ? targetId : null,
+      type,
+      reason,
+      status: "pending",
+    });
+    setSending(false);
+    setStep("done");
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/70 z-[100] flex items-end justify-center" onClick={onClose}>
+      <div className="w-full max-w-xl rounded-t-3xl overflow-hidden"
+        style={{ background: "rgba(12,12,22,0.99)", border: "1px solid rgba(255,255,255,0.08)" }}
+        onClick={e => e.stopPropagation()}>
+        <div className="w-10 h-1 rounded-full bg-white/20 mx-auto mt-4 mb-1" />
+        <div className="flex items-center justify-between px-5 py-4" style={{ borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: "rgba(255,60,60,0.15)" }}>
+              <Flag className="w-4 h-4 text-red-400" />
+            </div>
+            <h2 className="text-white font-bold text-base">Пожаловаться</h2>
+          </div>
+          <button onClick={onClose} className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center">
+            <X className="w-4 h-4 text-white" />
+          </button>
+        </div>
+
+        {step === "reason" ? (
+          <div className="px-4 py-3 pb-8">
+            <p className="text-white font-semibold text-sm px-1 mb-1">Выберите причину жалобы</p>
+            <p className="text-white/40 text-xs px-1 mb-4">Ничего страшного, если укажете причину неправильно. Мы проверим контент на соответствие всем правилам сообщества.</p>
+            <div className="space-y-1">
+              {REPORT_REASONS.map(reason => (
+                <button key={reason} onClick={() => handleSend(reason)} disabled={sending}
+                  className="w-full flex items-center justify-between px-4 py-3.5 rounded-2xl text-left hover:bg-white/5 transition disabled:opacity-40"
+                  style={{ border: "1px solid rgba(255,255,255,0.05)" }}>
+                  <span className="text-white/80 text-sm">{reason}</span>
+                  <ChevronRight className="w-4 h-4 text-white/20 shrink-0" />
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : (
+          <div className="px-5 py-8 pb-12 flex flex-col items-center text-center">
+            <div className="w-16 h-16 rounded-2xl flex items-center justify-center mb-4" style={{ background: "rgba(107,203,119,0.1)" }}>
+              <span className="text-3xl">✅</span>
+            </div>
+            <h3 className="text-white font-bold text-lg mb-2">Жалоба отправлена</h3>
+            <p className="text-white/40 text-sm mb-1">Причина: <span className="text-white/70">{selected}</span></p>
+            <p className="text-white/30 text-xs mt-2">Мы рассмотрим её в ближайшее время</p>
+            <button onClick={onClose} className="mt-6 px-8 py-2.5 rounded-2xl text-white text-sm"
+              style={{ background: "linear-gradient(135deg, #3D5AFE, #7B5CFF)" }}>
+              Закрыть
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
   );
 }
 
@@ -97,22 +182,13 @@ function VoiceRecorder({ onDone, onCancel }: { onDone: (blob: Blob) => void; onC
         const analyser = ctx.createAnalyser();
         analyser.fftSize = 64;
         src.connect(analyser);
-
         const mr = new MediaRecorder(stream);
         chunksRef.current = [];
         mr.ondataavailable = e => chunksRef.current.push(e.data);
-        mr.onstop = () => {
-          onDone(new Blob(chunksRef.current, { type: "audio/webm" }));
-          stream.getTracks().forEach(t => t.stop());
-        };
+        mr.onstop = () => { onDone(new Blob(chunksRef.current, { type: "audio/webm" })); stream.getTracks().forEach(t => t.stop()); };
         mr.start();
         mrRef.current = mr;
-
-        timerRef.current = setInterval(() => setSeconds(s => {
-          if (s >= 119) { mr.stop(); return s; }
-          return s + 1;
-        }), 1000);
-
+        timerRef.current = setInterval(() => setSeconds(s => { if (s >= 119) { mr.stop(); return s; } return s + 1; }), 1000);
         const animate = () => {
           const data = new Uint8Array(analyser.frequencyBinCount);
           analyser.getByteFrequencyData(data);
@@ -120,20 +196,13 @@ function VoiceRecorder({ onDone, onCancel }: { onDone: (blob: Blob) => void; onC
           animRef.current = requestAnimationFrame(animate);
         };
         animate();
-      } catch {
-        alert("Нет доступа к микрофону");
-        onCancel();
-      }
+      } catch { alert("Нет доступа к микрофону"); onCancel(); }
     })();
     return () => { clearInterval(timerRef.current); cancelAnimationFrame(animRef.current); };
   }, []);
 
   const stop = () => { clearInterval(timerRef.current); cancelAnimationFrame(animRef.current); mrRef.current?.stop(); };
-  const cancel = () => {
-    clearInterval(timerRef.current); cancelAnimationFrame(animRef.current);
-    mrRef.current?.stream.getTracks().forEach(t => t.stop());
-    onCancel();
-  };
+  const cancel = () => { clearInterval(timerRef.current); cancelAnimationFrame(animRef.current); mrRef.current?.stream.getTracks().forEach(t => t.stop()); onCancel(); };
   const fmt = (s: number) => `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`;
 
   return (
@@ -147,8 +216,7 @@ function VoiceRecorder({ onDone, onCancel }: { onDone: (blob: Blob) => void; onC
             style={{ height: `${Math.min(h, 28)}px`, background: "linear-gradient(to top, #ff4444, #ff8888)", minWidth: "2px" }} />
         ))}
       </div>
-      <button onClick={stop} className="w-8 h-8 rounded-full flex items-center justify-center shrink-0"
-        style={{ background: "linear-gradient(135deg, #3D5AFE, #7B5CFF)" }}>
+      <button onClick={stop} className="w-8 h-8 rounded-full flex items-center justify-center shrink-0" style={{ background: "linear-gradient(135deg, #3D5AFE, #7B5CFF)" }}>
         <Send className="w-3.5 h-3.5 text-white" />
       </button>
       <button onClick={cancel} className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 bg-white/10">
@@ -193,65 +261,36 @@ function CommentInput({ currentUserId, currentUserProfile, postId, parentId, onS
 
   return (
     <div className="flex gap-2.5 items-start">
-      <div className="w-8 h-8 rounded-full overflow-hidden shrink-0 ring-1 ring-white/10 mt-0.5"
-        style={{ background: "linear-gradient(135deg, #3D5AFE, #7B5CFF)" }}>
+      <div className="w-8 h-8 rounded-full overflow-hidden shrink-0 ring-1 ring-white/10 mt-0.5" style={{ background: "linear-gradient(135deg, #3D5AFE, #7B5CFF)" }}>
         {currentUserProfile?.avatar_url
           ? <img src={currentUserProfile.avatar_url} alt="you" className="w-full h-full object-cover" />
-          : <div className="w-full h-full flex items-center justify-center">
-              <span className="text-white font-bold text-xs">{currentUserProfile?.full_name?.[0] || "?"}</span>
-            </div>}
+          : <div className="w-full h-full flex items-center justify-center"><span className="text-white font-bold text-xs">{currentUserProfile?.full_name?.[0] || "?"}</span></div>}
       </div>
       <div className="flex-1">
         {recording ? (
-          <VoiceRecorder
-            onDone={blob => { setAudioBlob(blob); setRecording(false); setFocused(true); }}
-            onCancel={() => setRecording(false)} />
+          <VoiceRecorder onDone={blob => { setAudioBlob(blob); setRecording(false); setFocused(true); }} onCancel={() => setRecording(false)} />
         ) : audioBlob ? (
           <div className="space-y-2">
             <AudioPlayer url={URL.createObjectURL(audioBlob)} />
             <div className="flex gap-2">
-              <button onClick={() => setAudioBlob(null)}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-white/40 text-xs"
-                style={{ background: "rgba(255,255,255,0.05)" }}>
-                <X className="w-3 h-3" /> Удалить
-              </button>
-              <button onClick={handleSend} disabled={sending}
-                className="flex items-center gap-1.5 px-4 py-1.5 rounded-xl text-white text-xs disabled:opacity-40"
-                style={{ background: "linear-gradient(135deg, #3D5AFE, #7B5CFF)" }}>
-                <Send className="w-3 h-3" /> {sending ? "..." : "Отправить"}
-              </button>
+              <button onClick={() => setAudioBlob(null)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-white/40 text-xs" style={{ background: "rgba(255,255,255,0.05)" }}><X className="w-3 h-3" /> Удалить</button>
+              <button onClick={handleSend} disabled={sending} className="flex items-center gap-1.5 px-4 py-1.5 rounded-xl text-white text-xs disabled:opacity-40" style={{ background: "linear-gradient(135deg, #3D5AFE, #7B5CFF)" }}><Send className="w-3 h-3" /> {sending ? "..." : "Отправить"}</button>
             </div>
           </div>
         ) : (
           <>
-            {focused ? (
-              <textarea value={text} onChange={e => setText(e.target.value)} autoFocus rows={3}
-                placeholder={placeholder}
-                className="w-full px-3 py-2.5 rounded-2xl text-white text-sm placeholder-white/25 focus:outline-none resize-none"
-                style={{ background: "rgba(255,255,255,0.07)", border: "1px solid rgba(61,90,254,0.4)" }} />
-            ) : (
-              <div onClick={() => setFocused(true)}
-                className="w-full px-3 py-2.5 rounded-2xl text-white/25 text-sm cursor-text"
-                style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.08)" }}>
-                {placeholder}
-              </div>
-            )}
+            {focused
+              ? <textarea value={text} onChange={e => setText(e.target.value)} autoFocus rows={3} placeholder={placeholder}
+                  className="w-full px-3 py-2.5 rounded-2xl text-white text-sm placeholder-white/25 focus:outline-none resize-none"
+                  style={{ background: "rgba(255,255,255,0.07)", border: "1px solid rgba(61,90,254,0.4)" }} />
+              : <div onClick={() => setFocused(true)} className="w-full px-3 py-2.5 rounded-2xl text-white/25 text-sm cursor-text"
+                  style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.08)" }}>{placeholder}</div>}
             {focused && (
               <div className="flex items-center justify-between mt-2">
-                <button onClick={() => setRecording(true)}
-                  className="w-8 h-8 rounded-full flex items-center justify-center"
-                  style={{ background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.08)" }}>
-                  <Mic className="w-3.5 h-3.5 text-white/50" />
-                </button>
+                <button onClick={() => setRecording(true)} className="w-8 h-8 rounded-full flex items-center justify-center" style={{ background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.08)" }}><Mic className="w-3.5 h-3.5 text-white/50" /></button>
                 <div className="flex gap-2">
-                  <button onClick={() => { setFocused(false); setText(""); }}
-                    className="px-4 py-1.5 rounded-xl text-white/40 text-sm"
-                    style={{ background: "rgba(255,255,255,0.05)" }}>Отмена</button>
-                  <button onClick={handleSend} disabled={!text.trim() || sending}
-                    className="px-4 py-1.5 rounded-xl text-white text-sm disabled:opacity-40"
-                    style={{ background: "linear-gradient(135deg, #3D5AFE, #7B5CFF)" }}>
-                    {sending ? "..." : "Отправить"}
-                  </button>
+                  <button onClick={() => { setFocused(false); setText(""); }} className="px-4 py-1.5 rounded-xl text-white/40 text-sm" style={{ background: "rgba(255,255,255,0.05)" }}>Отмена</button>
+                  <button onClick={handleSend} disabled={!text.trim() || sending} className="px-4 py-1.5 rounded-xl text-white text-sm disabled:opacity-40" style={{ background: "linear-gradient(135deg, #3D5AFE, #7B5CFF)" }}>{sending ? "..." : "Отправить"}</button>
                 </div>
               </div>
             )}
@@ -272,12 +311,12 @@ function CommentItem({ comment, currentUserId, currentUserProfile, postId, depth
   const [showReplies, setShowReplies] = useState(false);
   const [replies, setReplies] = useState<any[]>(comment.replies || []);
   const [showMenu, setShowMenu] = useState(false);
+  const [showReport, setShowReport] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!currentUserId) return;
-    supabase.from("comment_likes").select("*").eq("comment_id", comment.id).eq("user_id", currentUserId).maybeSingle()
-      .then(({ data }) => setLiked(!!data));
+    supabase.from("comment_likes").select("*").eq("comment_id", comment.id).eq("user_id", currentUserId).maybeSingle().then(({ data }) => setLiked(!!data));
   }, [comment.id, currentUserId]);
 
   useEffect(() => {
@@ -301,14 +340,15 @@ function CommentItem({ comment, currentUserId, currentUserProfile, postId, depth
 
   return (
     <div className={depth > 0 ? "ml-10 mt-3" : ""} style={{ animation: "fadeIn 0.2s ease" }}>
+      {showReport && (
+        <ReportModal type="comment" targetId={comment.id} reportedUserId={comment.profiles?.id}
+          currentUserId={currentUserId} onClose={() => setShowReport(false)} />
+      )}
       <div className="flex gap-3">
-        <div className="w-8 h-8 rounded-full overflow-hidden shrink-0 ring-1 ring-white/10 mt-0.5"
-          style={{ background: "linear-gradient(135deg, #3D5AFE, #7B5CFF)" }}>
+        <div className="w-8 h-8 rounded-full overflow-hidden shrink-0 ring-1 ring-white/10 mt-0.5" style={{ background: "linear-gradient(135deg, #3D5AFE, #7B5CFF)" }}>
           {comment.profiles?.avatar_url
             ? <img src={comment.profiles.avatar_url} alt="avatar" className="w-full h-full object-cover" />
-            : <div className="w-full h-full flex items-center justify-center">
-                <span className="text-white font-bold text-xs">{comment.profiles?.full_name?.[0] || "?"}</span>
-              </div>}
+            : <div className="w-full h-full flex items-center justify-center"><span className="text-white font-bold text-xs">{comment.profiles?.full_name?.[0] || "?"}</span></div>}
         </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-center justify-between gap-2">
@@ -321,9 +361,9 @@ function CommentItem({ comment, currentUserId, currentUserProfile, postId, depth
                 <MoreHorizontal className="w-3.5 h-3.5 text-white/25" />
               </button>
               {showMenu && (
-                <div className="absolute right-0 top-7 z-30 w-40 rounded-2xl overflow-hidden border border-white/10"
+                <div className="absolute right-0 top-7 z-30 w-44 rounded-2xl overflow-hidden border border-white/10"
                   style={{ background: "rgba(18,18,32,0.98)", backdropFilter: "blur(20px)" }}>
-                  <button onClick={() => { setShowMenu(false); alert("Жалоба отправлена"); }}
+                  <button onClick={() => { setShowMenu(false); setShowReport(true); }}
                     className="w-full px-4 py-3 text-left text-red-400 text-sm hover:bg-white/5 flex items-center gap-2">
                     <Flag className="w-3.5 h-3.5 shrink-0" /> Пожаловаться
                   </button>
@@ -331,59 +371,38 @@ function CommentItem({ comment, currentUserId, currentUserProfile, postId, depth
               )}
             </div>
           </div>
-
           {comment.content && <p className="text-white/80 text-sm mt-1 leading-relaxed break-words">{comment.content}</p>}
           {comment.audio_url && <AudioPlayer url={comment.audio_url} />}
-
           <div className="flex items-center gap-3 mt-2">
             <button onClick={handleLike} className="flex items-center gap-1.5 transition group">
               <ThumbsUp className={`w-3.5 h-3.5 transition ${liked ? "text-blue-400" : "text-white/25 group-hover:text-white/50"}`} strokeWidth={1.5} />
               {likesCount > 0 && <span className={`text-xs ${liked ? "text-blue-400" : "text-white/25"}`}>{likesCount}</span>}
             </button>
             {depth === 0 && (
-              <button onClick={() => setShowReply(!showReply)}
-                className="flex items-center gap-1 text-white/25 hover:text-white/60 transition text-xs">
-                <CornerDownRight className="w-3.5 h-3.5" strokeWidth={1.5} />
-                Ответить
+              <button onClick={() => setShowReply(!showReply)} className="flex items-center gap-1 text-white/25 hover:text-white/60 transition text-xs">
+                <CornerDownRight className="w-3.5 h-3.5" strokeWidth={1.5} /> Ответить
               </button>
             )}
           </div>
-
           {showReply && depth === 0 && (
             <div className="mt-3" style={{ animation: "fadeIn 0.15s ease" }}>
-              <CommentInput
-                currentUserId={currentUserId}
-                currentUserProfile={currentUserProfile}
-                postId={postId}
-                parentId={comment.id}
-                placeholder={`Ответить ${comment.profiles?.full_name || ""}...`}
-                autoFocus
-                onSent={reply => {
-                  setReplies(prev => [...prev, reply]);
-                  setShowReplies(true);
-                  setShowReply(false);
-                }}
-              />
+              <CommentInput currentUserId={currentUserId} currentUserProfile={currentUserProfile} postId={postId} parentId={comment.id}
+                placeholder={`Ответить ${comment.profiles?.full_name || ""}...`} autoFocus
+                onSent={reply => { setReplies(prev => [...prev, reply]); setShowReplies(true); setShowReply(false); }} />
               <button onClick={() => setShowReply(false)} className="mt-1.5 text-white/25 text-xs hover:text-white/50">Отмена</button>
             </div>
           )}
-
           {replies.length > 0 && depth === 0 && (
-            <button onClick={() => setShowReplies(!showReplies)}
-              className="flex items-center gap-1.5 mt-2 text-blue-400 text-xs hover:text-blue-300 transition">
+            <button onClick={() => setShowReplies(!showReplies)} className="flex items-center gap-1.5 mt-2 text-blue-400 text-xs hover:text-blue-300 transition">
               {showReplies ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
               {showReplies ? "Скрыть ответы" : `Показать ответы (${replies.length})`}
             </button>
           )}
         </div>
       </div>
-
       {showReplies && replies.length > 0 && (
         <div style={{ animation: "fadeIn 0.2s ease" }}>
-          {replies.map(r => (
-            <CommentItem key={r.id} comment={r} currentUserId={currentUserId}
-              currentUserProfile={currentUserProfile} postId={postId} depth={1} />
-          ))}
+          {replies.map(r => <CommentItem key={r.id} comment={r} currentUserId={currentUserId} currentUserProfile={currentUserProfile} postId={postId} depth={1} />)}
         </div>
       )}
     </div>
@@ -408,14 +427,10 @@ function CommentsSection({ postId, currentUserId, currentUserProfile }: {
       .eq("post_id", postId).is("parent_id", null)
       .order(sortBy === "new" ? "created_at" : "likes_count", { ascending: false })
       .range(from, from + PAGE_SIZE - 1);
-
     const withReplies = await Promise.all((data || []).map(async c => {
-      const { data: reps } = await supabase.from("comments")
-        .select("*, profiles(id, full_name, username, avatar_url)")
-        .eq("parent_id", c.id).order("created_at", { ascending: true });
+      const { data: reps } = await supabase.from("comments").select("*, profiles(id, full_name, username, avatar_url)").eq("parent_id", c.id).order("created_at", { ascending: true });
       return { ...c, replies: reps || [] };
     }));
-
     if (reset) setComments(withReplies);
     else setComments(prev => [...prev, ...withReplies]);
     setHasMore((data || []).length === PAGE_SIZE);
@@ -430,36 +445,24 @@ function CommentsSection({ postId, currentUserId, currentUserProfile }: {
     <>
       <style>{`@keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}`}</style>
       <div className="px-4 py-4">
-        {/* Заголовок + сортировка */}
         <div className="flex items-center justify-between mb-4">
           <span className="text-white font-semibold text-sm">{total > 0 ? `${total} комментариев` : "Комментарии"}</span>
           <div className="flex gap-1 p-1 rounded-2xl" style={{ background: "rgba(255,255,255,0.05)" }}>
             {(["new", "top"] as const).map(s => (
-              <button key={s} onClick={() => setSort(s)}
-                className="px-3 py-1 rounded-xl text-xs transition"
-                style={{
-                  background: sort === s ? "linear-gradient(135deg, #3D5AFE, #7B5CFF)" : "transparent",
-                  color: sort === s ? "white" : "rgba(255,255,255,0.4)"
-                }}>
+              <button key={s} onClick={() => setSort(s)} className="px-3 py-1 rounded-xl text-xs transition"
+                style={{ background: sort === s ? "linear-gradient(135deg, #3D5AFE, #7B5CFF)" : "transparent", color: sort === s ? "white" : "rgba(255,255,255,0.4)" }}>
                 {s === "new" ? "Новые" : "Популярные"}
               </button>
             ))}
           </div>
         </div>
-
-        {/* Поле ввода */}
         <div className="mb-5">
           <CommentInput currentUserId={currentUserId} currentUserProfile={currentUserProfile}
             postId={postId} onSent={c => setComments(prev => [{ ...c, replies: [] }, ...prev])} />
         </div>
-
         <div className="h-px bg-white/[0.05] mb-4" />
-
-        {/* Список */}
         {loading ? (
-          <div className="flex justify-center py-8">
-            <div className="w-6 h-6 border-2 border-purple-500 border-t-transparent rounded-full animate-spin" />
-          </div>
+          <div className="flex justify-center py-8"><div className="w-6 h-6 border-2 border-purple-500 border-t-transparent rounded-full animate-spin" /></div>
         ) : comments.length === 0 ? (
           <div className="flex flex-col items-center py-10 text-white/20">
             <span className="text-3xl mb-2">💬</span>
@@ -468,13 +471,9 @@ function CommentsSection({ postId, currentUserId, currentUserProfile }: {
           </div>
         ) : (
           <div className="space-y-5">
-            {comments.map(c => (
-              <CommentItem key={c.id} comment={c} currentUserId={currentUserId}
-                currentUserProfile={currentUserProfile} postId={postId} />
-            ))}
+            {comments.map(c => <CommentItem key={c.id} comment={c} currentUserId={currentUserId} currentUserProfile={currentUserProfile} postId={postId} />)}
           </div>
         )}
-
         {hasMore && !loading && (
           <button onClick={() => { const next = page + 1; setPage(next); load(sort, next); }}
             className="w-full mt-5 py-2.5 rounded-2xl text-white/40 text-sm hover:text-white/70 transition"
@@ -493,6 +492,7 @@ function PostCard({ post, currentUserId, currentUserProfile }: { post: any; curr
   const [views, setViews] = useState(post.views || 0);
   const [expanded, setExpanded] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
+  const [showReport, setShowReport] = useState(false);
   const [mediaPreview, setMediaPreview] = useState<string | null>(null);
   const [liked, setLiked] = useState(false);
   const [disliked, setDisliked] = useState(false);
@@ -563,37 +563,31 @@ function PostCard({ post, currentUserId, currentUserProfile }: { post: any; curr
 
   return (
     <>
+      {showReport && (
+        <ReportModal type="post" targetId={post.id} reportedUserId={post.profiles?.id}
+          currentUserId={currentUserId} onClose={() => setShowReport(false)} />
+      )}
       {mediaPreview && (
         <div className="fixed inset-0 bg-black z-50 flex items-center justify-center" onClick={() => setMediaPreview(null)}>
-          <button className="absolute top-14 right-4 w-10 h-10 rounded-full bg-white/10 flex items-center justify-center">
-            <X className="w-5 h-5 text-white" />
-          </button>
+          <button className="absolute top-14 right-4 w-10 h-10 rounded-full bg-white/10 flex items-center justify-center"><X className="w-5 h-5 text-white" /></button>
           {mediaPreview.match(/\.(mp4|mov|mpeg|webm)$/i)
             ? <video src={mediaPreview} controls autoPlay className="max-w-full max-h-full" onClick={e => e.stopPropagation()} />
             : <img src={mediaPreview} alt="media" className="max-w-full max-h-full object-contain" />}
         </div>
       )}
-
       <div className="flex justify-center px-4">
         <div className="w-full max-w-xl">
-          {/* Карточка поста */}
           <div className="rounded-3xl" style={{
             background: "linear-gradient(135deg, rgba(255,255,255,0.06) 0%, rgba(255,255,255,0.02) 100%)",
-            backdropFilter: "blur(20px)",
-            border: "1px solid rgba(255,255,255,0.08)",
+            backdropFilter: "blur(20px)", border: "1px solid rgba(255,255,255,0.08)",
             boxShadow: "0 10px 40px -5px rgba(123, 92, 255, 0.3), inset 0 1px 0 rgba(255,255,255,0.1)"
           }}>
             <div className="flex items-center gap-3 p-4 pb-2">
               <button onClick={() => post.channels?.id && router.push(`/channel/${post.channels.id}`)}>
-                <div className="w-10 h-10 rounded-full overflow-hidden ring-2 ring-white/10 shrink-0"
-                  style={{ background: "linear-gradient(135deg, #3D5AFE, #7B5CFF)" }}>
-                  {post.channels?.avatar_url
-                    ? <img src={post.channels.avatar_url} alt="avatar" className="w-full h-full object-cover" />
-                    : post.profiles?.avatar_url
-                      ? <img src={post.profiles.avatar_url} alt="avatar" className="w-full h-full object-cover" />
-                      : <div className="w-full h-full flex items-center justify-center">
-                          <span className="text-white font-bold text-sm">{post.channels?.name?.[0] || post.profiles?.full_name?.[0] || "?"}</span>
-                        </div>}
+                <div className="w-10 h-10 rounded-full overflow-hidden ring-2 ring-white/10 shrink-0" style={{ background: "linear-gradient(135deg, #3D5AFE, #7B5CFF)" }}>
+                  {post.channels?.avatar_url ? <img src={post.channels.avatar_url} alt="avatar" className="w-full h-full object-cover" />
+                    : post.profiles?.avatar_url ? <img src={post.profiles.avatar_url} alt="avatar" className="w-full h-full object-cover" />
+                    : <div className="w-full h-full flex items-center justify-center"><span className="text-white font-bold text-sm">{post.channels?.name?.[0] || post.profiles?.full_name?.[0] || "?"}</span></div>}
                 </div>
               </button>
               <div className="flex-1 min-w-0">
@@ -605,9 +599,9 @@ function PostCard({ post, currentUserId, currentUserProfile }: { post: any; curr
                   <MoreHorizontal className="w-5 h-5 text-white/50" />
                 </button>
                 {showMenu && (
-                  <div className="absolute right-0 top-10 z-20 w-40 rounded-2xl overflow-hidden border border-white/10"
+                  <div className="absolute right-0 top-10 z-20 w-44 rounded-2xl overflow-hidden border border-white/10"
                     style={{ background: "rgba(20,20,40,0.95)", backdropFilter: "blur(20px)" }}>
-                    <button onClick={() => { setShowMenu(false); alert("Жалоба отправлена"); }}
+                    <button onClick={() => { setShowMenu(false); setShowReport(true); }}
                       className="w-full px-4 py-3 text-left text-red-400 text-sm hover:bg-white/5 flex items-center gap-2">
                       <Flag className="w-4 h-4 shrink-0" strokeWidth={1.5} /> Пожаловаться
                     </button>
@@ -615,14 +609,12 @@ function PostCard({ post, currentUserId, currentUserProfile }: { post: any; curr
                 )}
               </div>
             </div>
-
             {post.content && (
               <div className="px-4 py-2">
                 <p className="text-white/90 text-sm leading-relaxed">{renderHashtags(post.content, router, expanded, isLong)}</p>
                 {isLong && <button onClick={() => setExpanded(!expanded)} className="text-blue-400 text-xs mt-1 hover:text-blue-300 transition">{expanded ? "Скрыть" : "Читать далее"}</button>}
               </div>
             )}
-
             {post.image_url && (
               <div className="px-4 pb-2 cursor-pointer" onClick={() => setMediaPreview(post.image_url)}>
                 {post.image_url.match(/\.(mp4|mov|mpeg|webm)$/i)
@@ -635,7 +627,6 @@ function PostCard({ post, currentUserId, currentUserProfile }: { post: any; curr
                   : <img src={post.image_url} alt="post" className="w-full rounded-2xl object-contain" style={{ maxHeight: "300px" }} />}
               </div>
             )}
-
             <div className="px-4 py-3 flex items-center justify-between gap-2">
               <div className="flex items-center gap-2">
                 <button onClick={handleLike} className="flex items-center gap-1.5 px-3 py-2 rounded-2xl transition-all"
@@ -653,29 +644,23 @@ function PostCard({ post, currentUserId, currentUserProfile }: { post: any; curr
                 </div>
               </div>
               <div className="flex items-center gap-2">
-                <button onClick={() => setShowComments(!showComments)}
-                  className="flex items-center gap-1.5 px-3 py-2 rounded-2xl transition"
+                <button onClick={() => setShowComments(!showComments)} className="flex items-center gap-1.5 px-3 py-2 rounded-2xl transition"
                   style={{ background: showComments ? activeBtnStyle : btnStyle, border: "1px solid rgba(255,255,255,0.08)" }}>
                   <MessageCircle className="w-4 h-4 text-white/70" strokeWidth={1.5} />
                   <span className="text-xs text-white/70">{formatCount(commentsCount)}</span>
                 </button>
-                <button className="flex items-center justify-center px-3 py-2 rounded-2xl"
-                  style={{ background: btnStyle, border: "1px solid rgba(255,255,255,0.08)" }}>
+                <button className="flex items-center justify-center px-3 py-2 rounded-2xl" style={{ background: btnStyle, border: "1px solid rgba(255,255,255,0.08)" }}>
                   <Repeat2 className="w-4 h-4 text-white/70" strokeWidth={1.5} />
                 </button>
-                <button className="flex items-center justify-center px-3 py-2 rounded-2xl"
-                  style={{ background: btnStyle, border: "1px solid rgba(255,255,255,0.08)" }}
+                <button className="flex items-center justify-center px-3 py-2 rounded-2xl" style={{ background: btnStyle, border: "1px solid rgba(255,255,255,0.08)" }}
                   onClick={() => { const url = `${window.location.origin}/post/${post.id}`; try { navigator.clipboard.writeText(url); } catch { alert(url); } }}>
                   <Share2 className="w-4 h-4 text-white/70" strokeWidth={1.5} />
                 </button>
               </div>
             </div>
           </div>
-
-          {/* Комментарии под постом */}
           {showComments && (
-            <div className="mt-1 rounded-3xl"
-              style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)" }}>
+            <div className="mt-1 rounded-3xl" style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)" }}>
               <CommentsSection postId={post.id} currentUserId={currentUserId} currentUserProfile={currentUserProfile} />
             </div>
           )}
@@ -728,9 +713,7 @@ export default function FeedPage() {
         </div>
       ) : (
         <div className="space-y-4 pb-8">
-          {posts.map(post => (
-            <PostCard key={post.id} post={post} currentUserId={currentUser?.id} currentUserProfile={currentUserProfile} />
-          ))}
+          {posts.map(post => <PostCard key={post.id} post={post} currentUserId={currentUser?.id} currentUserProfile={currentUserProfile} />)}
         </div>
       )}
     </div>
