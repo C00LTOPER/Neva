@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { Home, Newspaper, Bookmark, Radio, Search, Settings } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import BanScreen from "./components/BanScreen";
 
 export default function MainLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -11,11 +12,13 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
   const [open, setOpen] = useState(false);
   const [profile, setProfile] = useState<any>(null);
   const [checked, setChecked] = useState(false);
+  const [userId, setUserId] = useState("");
 
   useEffect(() => {
     const load = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) { router.replace("/login"); return; }
+      setUserId(session.user.id);
       const { data } = await supabase.from("profiles").select("*").eq("id", session.user.id).single();
       setProfile(data);
       setChecked(true);
@@ -47,6 +50,8 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
 
   return (
     <div className="flex min-h-screen bg-[#0a0a0f] overflow-hidden">
+      <BanScreen userId={userId} />
+
       {open && (
         <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
       )}
